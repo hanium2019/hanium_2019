@@ -6,7 +6,7 @@ AR과 VR을 이용해 3차원 공간에 정보들을 시각적으로 배치하�
 AR-based real-time screen sharing conference system.  
 By using AR and VR to visually arrange information in 3-dimensional space and sharing it in real time, it facilitates communication between each other and saves unnecessary time for delivering the contents of the meeting.
 
-## Projects progress
+## Projects Roles
 
 |  <center>분  류</center> |  <center>담  당</center> |  <center>개발 내용</center> | 
 |:--------|:--------:|--------:| 
@@ -14,3 +14,8 @@ By using AR and VR to visually arrange information in 3-dimensional space and sh
 |<center>Unity </center> |<center>김수빈 김민수</center> |*LeapMotion, Oculus*|
 |<center>WinAPI </center>|<center>김세진 송진호</center> |*winAPI 프로세스 사용 코드 분석*|
 
+## Projects progress
+[Oculus Unity](https://github.com/hanium2019/hanium_2019/blob/master/Oculus_Unity/Oculus_Unity.md)  
+[Leap Motion](https://github.com/hanium2019/hanium_2019/blob/master/leapMotion/leapMotion.md)  
+[Web](https://github.com/hanium2019/hanium_2019/blob/master/web/webreadme.md)  
+[winAPI](https://github.com/hanium2019/hanium_2019/blob/master/winAPI/winApi.md)  

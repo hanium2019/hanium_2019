@@ -4,6 +4,6 @@
 #### 진행사항
 
 * 이호찬
-> 1. https://velopert.com/node-js-tutorials 진행중
+> 1. https://velopert.com/node-js-tutorials 진행중 (2019-07-16~)
 
 * 박영준
