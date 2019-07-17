@@ -13,3 +13,5 @@
 Dependancies: Express, Nodemon  
 
 * 박영준
+> 1. Do it! Node.js 프로그래밍 책 
+> 2. https://www.inflearn.com/course/2017-node-js-%ED%94%84%EB%A1%9C%EA%B7%B8%EB%9E%98%EB%B0%8D Node.js 진행중
