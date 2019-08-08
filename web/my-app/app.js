@@ -9,6 +9,8 @@ var usersRouter = require('./routes/users');
 
 var app = express();
 
+app.io = require('socket.io')();
+
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'jade');
@@ -36,6 +38,17 @@ app.use(function(err, req, res, next) {
   // render the error page
   res.status(err.status || 500);
   res.render('error');
+});
+
+app.io.on('connection', function(socket){
+  console.log('socketio user connected...');
+  // socket.emit("news", "hi");
+  console.log('2222')   
+  socket.emit('news', "{ hello: world }"); 
+  socket.on('my other event', function (data) { 
+    console.log("33333")
+    console.log(data);
+  });
 });
 
 module.exports = app;
