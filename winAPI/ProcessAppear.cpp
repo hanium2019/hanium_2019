@@ -6,6 +6,10 @@
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam);
 
+BOOL CALLBACK EnumWindowMIN(HWND hwnd, LPARAM lParam);
+
+BOOL CALLBACK EnumWindowRES(HWND hwnd, LPARAM lParam);
+
 LPCTSTR lpszClass = _T("Process Appear");
 
 HINSTANCE hInst;
@@ -55,38 +59,56 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 
 	switch (iMsg) {
 	case WM_CREATE:
-		CreateWindow(_T("button"), _T("Button 1"),
+		CreateWindow(_T("button"), _T("MAX"),
 			WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
 			20, 20, 100, 30,
 			hwnd, (HMENU)0101, hInst, NULL);
-		CreateWindow(_T("button"), _T("Button 2"),
+		CreateWindow(_T("button"), _T("RESTORE"),
 			WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
 			20, 60, 100, 30,
 			hwnd, (HMENU)0102, hInst, NULL);
-		CreateWindow(_T("button"), _T("Button 3"),
+		CreateWindow(_T("button"), _T("MIN"),
 			WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
 			20, 100, 100, 30,
 			hwnd, (HMENU)0103, hInst, NULL);
-		CreateWindow(_T("button"), _T("Button 4"),
+		CreateWindow(_T("button"), _T("MIN ALL"),
 			WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
 			20, 140, 100, 30,
 			hwnd, (HMENU)0104, hInst, NULL);
+		CreateWindow(_T("button"), _T("RESTORE ALL"),
+			WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+			20, 180, 100, 30,
+			hwnd, (HMENU)0105, hInst, NULL);
+		CreateWindow(_T("button"), _T("CLOSE"),
+			WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+			20, 220, 100, 30,
+			hwnd, (HMENU)0106, hInst, NULL);
 		break;
 	case WM_COMMAND:
 		switch (LOWORD(wParam)) {
 		case 0101:
-			ShowWindow(hwnd, SW_SHOWMAXIMIZED);
+			//ShowWindow(hwnd, SW_SHOWMAXIMIZED);
+			SendMessage(hwnd, WM_SYSCOMMAND, SC_MAXIMIZE, 0);
 			break;
 		case 0102:
-			ShowWindow(hwnd, SW_RESTORE);
+			SendMessage(hwnd, WM_SYSCOMMAND, SC_RESTORE, 0);
 			break;
 		case 0103:
-			ShowWindow(hwnd, SW_MINIMIZE);
+			SendMessage(hwnd, WM_SYSCOMMAND, SC_MINIMIZE, 0);
 			break;
 		case 0104:
-			pid = GetCurrentProcessId();
-			hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
-			CreateRemoteThread(hProcess, 0, 0, 0, ExitProcess, 0, 0);
+			// 윈도우를 찾을 때마다 EnumWindowsProc 호출
+			EnumWindows(EnumWindowMIN, NULL);
+			break;
+		case 0105:
+			// 윈도우를 찾을 때마다 EnumWindowsProc 호출
+			EnumWindows(EnumWindowRES, NULL);
+			break;
+		case 0106:
+			//pid = GetCurrentProcessId();
+			//hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+			//CreateRemoteThread(hProcess, 0, 0, 0, ExitProcess, 0, 0);
+			SendMessage(hwnd, WM_SYSCOMMAND, SC_CLOSE, 0);
 			break;
 		}
 	case WM_SIZE:
@@ -112,6 +134,22 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 	return DefWindowProc(hwnd, iMsg, wParam, lParam);
 }
 
+BOOL CALLBACK EnumWindowMIN(HWND hwnd, LPARAM lParam) {
+	if (IsWindowVisible(hwnd)) { // 찾은 윈도우가 화면에 보이는 윈도우라면
+		SendMessage(hwnd, WM_SYSCOMMAND, SC_MINIMIZE, 0);
+	}
+	return TRUE; // 계속 열거하려면 TRUE를 반환해야 한다
+}
+
+BOOL CALLBACK EnumWindowRES(HWND hwnd, LPARAM lParam) {
+	if (IsWindowVisible(hwnd)) { // 찾은 윈도우가 화면에 보이는 윈도우라면
+		SendMessage(hwnd, WM_SYSCOMMAND, SC_RESTORE, 0);
+	}
+	return TRUE; // 계속 열거하려면 TRUE를 반환해야 한다
+}
+
+
+/*
 void FindPID(void) {
 	HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 	if (hSnapshot == INVALID_HANDLE_VALUE) {
@@ -128,3 +166,4 @@ void FindPID(void) {
 	CloseHandle(hSnapshot);
 	return;
 }
+*/
