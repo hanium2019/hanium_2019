@@ -25,7 +25,7 @@ By using AR and VR to visually arrange information in 3-dimensional space and sh
  ● 회의 후 참여자의 정보, 사용된 문서가 자동으로 정리되어 이후에 새로운 회의 참가자도 조회 가능 
 
 ## 📑구성도
-![img](./img/ACS구성도.png)
+![img](./img/ACS구성도.PNG)
 
 ## 🤝역할 분담
 
