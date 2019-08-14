@@ -2,7 +2,7 @@
 ![Stargazers](https://img.shields.io/badge/github-GIVEME--STAR-red?logo=GitHub)
 ![Unity](https://img.shields.io/badge/Oculus-Unity-yellow?logo=Unity)
 ![Slack](https://img.shields.io/badge/Slack-hanium2019-blueviolet?logo=Slack)
-![WinAPI](https://img.shields.io/badge/WinAPI-C%2B%2B-blue?logo=C++)
+![WinAPI](https://img.shields.io/badge/WinAPI-C%2B%2B-blue?logo=C%2B%2B)
 
 AR 기반 실시간 화면 공유 회의 시스템(*ACS*)입니다.  
 AR과 VR을 이용해 3차원 공간에 정보들을 시각적으로 배치하여 이를 실시간으로 공유해 서로 간의 의사소통을 원활하게 하여 회의 내용을 전달하기 위해 소모되는 불필요한 시간을 절약 해줍니다.
