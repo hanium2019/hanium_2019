@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <tchar.h>
 #include <windows.h>
-#include <TlHelp32.h>
-#include <string>
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam);
+
+LRESULT CALLBACK WndEmpty(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam);
 
 BOOL CALLBACK EnumWindowMinimize(HWND hwnd, LPARAM lParam);
 
@@ -12,11 +12,18 @@ BOOL CALLBACK EnumWindowRestore(HWND hwnd, LPARAM lParam);
 
 BOOL CALLBACK EnumWindowCapture(HWND hwnd, LPARAM lParam);
 
-BOOL WindowCapture(HWND hwnd);
+HBITMAP WindowCapture(HWND hwnd);
 
-LPCTSTR lpszClass = _T("Process Appear");
+LPCTSTR lpszClass = _T("MainWindow");
 
 HINSTANCE hInst;
+
+HWND g_hwnd;
+
+HBITMAP hBit = NULL;
+
+RECT rct;
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR lpszCmdLine, int nCmdShow) {
 	HWND hwnd;
 	MSG msg;
@@ -30,10 +37,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR lpszCmdLine, int nCmdSh
 	WndClass.hInstance = hInstance;
 	WndClass.hIcon = LoadIcon(NULL, IDI_APPLICATION);
 	WndClass.hCursor = LoadCursor(NULL, IDC_ARROW);
-	WndClass.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
-	WndClass.lpszMenuName = NULL;
+	WndClass.hbrBackground = (HBRUSH)GetStockObject(GRAY_BRUSH);
 	WndClass.lpszClassName = lpszClass;
+	WndClass.lpszMenuName = NULL;
 
+	RegisterClass(&WndClass);
+
+	WndClass.lpfnWndProc = WndEmpty;
+	WndClass.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
+	WndClass.lpszClassName = _T("EmptyWindow");
+	
 	RegisterClass(&WndClass);
 
 	hwnd = CreateWindow(lpszClass, lpszClass, WS_OVERLAPPEDWINDOW,
@@ -51,7 +64,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR lpszCmdLine, int nCmdSh
 }
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
-	HDC hdc;
 	PAINTSTRUCT ps;
 	//HANDLE hProcess;
 	//DWORD pid;
@@ -110,12 +122,20 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 			EnumWindows(EnumWindowRestore, NULL);
 			break;
 		case 0106:
-			EnumWindows(EnumWindowCapture, NULL);
+			// 윈도우를 찾을 때마다 EnumWindowsProc 호출
+			//EnumWindows(EnumWindowCapture, NULL);
+			g_hwnd = FindWindow(NULL, _T("캡처 도구"));
+			GetClientRect(g_hwnd, &rct); // 현재 윈도우의 좌표값을 받아온다
+			CreateWindow("EmptyWindow", "EmptyWindow", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+				CW_USEDEFAULT, CW_USEDEFAULT, rct.right - rct.left, rct.bottom - rct.top,
+				NULL, (HMENU)NULL, hInst, NULL);
+			hBit = WindowCapture(g_hwnd);
 			break;
 		case 0107:
-			//pid = GetCurrentProcessId();
-			//hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
-			//CreateRemoteThread(hProcess, 0, 0, 0, ExitProcess, 0, 0);
+			// pid = GetCurrentProcessId();
+			// Process = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
+			// CreateRemoteThread(hProcess, 0, 0, 0, ExitProcess, 0, 0);
+			// 부모가 아닌 독립적인 관계여도 닫기는 공유
 			SendMessage(hwnd, WM_SYSCOMMAND, SC_CLOSE, 0);
 			break;
 		}
@@ -132,7 +152,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 			break;
 		}
 	case WM_PAINT:
-		hdc = BeginPaint(hwnd, &ps);
+		BeginPaint(hwnd, &ps);
 		EndPaint(hwnd, &ps);
 		break;
 	case WM_DESTROY:
@@ -140,6 +160,32 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 		break;
 	}
 	return DefWindowProc(hwnd, iMsg, wParam, lParam);
+}
+
+LRESULT CALLBACK WndEmpty(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
+	HDC hdc, memdc;
+	BITMAP bmp;
+	PAINTSTRUCT ps;
+
+	switch (iMsg) {
+	case WM_PAINT:
+		hdc = BeginPaint(hwnd, &ps);
+		if (hBit != NULL) {
+			memdc = CreateCompatibleDC(hdc);
+			SelectObject(memdc, hBit);
+			GetObject(hBit, sizeof(BITMAP), &bmp);
+			BitBlt(hdc, 0, 0, bmp.bmWidth, bmp.bmHeight, memdc, 0, 0, SRCCOPY);
+			DeleteDC(memdc);
+		}
+		EndPaint(hwnd, &ps);
+		break;
+	case WM_DESTROY:
+		if (hBit != NULL)
+			DeleteObject(hBit);
+		PostQuitMessage(0);
+		break;
+	}
+	return(DefWindowProc(hwnd, iMsg, wParam, lParam));
 }
 
 BOOL CALLBACK EnumWindowMinimize(HWND hwnd, LPARAM lParam) {
@@ -158,68 +204,34 @@ BOOL CALLBACK EnumWindowRestore(HWND hwnd, LPARAM lParam) {
 
 BOOL CALLBACK EnumWindowCapture(HWND hwnd, LPARAM lParam) {
 	if (IsWindowVisible(hwnd)) {
-		WindowCapture(hwnd);
+		hBit = WindowCapture(hwnd);
 	}
-	return TRUE;
+	return TRUE; // 계속 열거하려면 TRUE를 반환해야 한다
 }
 
-BOOL WindowCapture(HWND hwnd) {
-	BOOL b = TRUE;
-	RECT rct;
-	GetWindowRect(hwnd, &rct); // 현재 윈도우의 좌표값을 받아온다
+HBITMAP WindowCapture(HWND hwnd) {
+	HDC hScrdc = GetDC(hwnd);
+	HDC hMemdc = CreateCompatibleDC(hScrdc); // hdc와 호환되는 memdc 생성
 
-	HDC hdc = GetDC(hwnd); // 현재 윈도우의 DC 핸들을 받아온다, DC에 기본값으로 선택된다
-	HDC memdc = CreateCompatibleDC(hdc); // hdc와 호환되는 memdc 생성
-	 // hdc와 호환되는 비트맵 hBit 생성
-	HBITMAP hBit = CreateCompatibleBitmap(hdc, rct.right - rct.left, rct.bottom - rct.left);
-	HBITMAP hOld = (HBITMAP)SelectObject(memdc, hBit); // memdc에 hBit 형식의 그림을 그리기 위해서 사용
-	
-	// memdc로부터 비트맵을 복사해와서 hdc에 출력
-	CreateWindow(lpszClass, lpszClass, WS_OVERLAPPEDWINDOW,
-		CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
-		hwnd, (HMENU)NULL, hInst, NULL);
-	BitBlt(hdc, 0, 0, rct.right - rct.left, rct.bottom - rct.top, memdc, 0, 0, SRCCOPY); 
+	// hdc와 호환되는 비트맵 hBit 생성
 
-	// 클립보드에 복사
-	OpenClipboard(NULL);
-	EmptyClipboard();
-	SetClipboardData(CF_BITMAP, hBit);
-	CloseClipboard();
+	HBITMAP hBitmap = CreateCompatibleBitmap(hScrdc, rct.right, rct.bottom);
+	HBITMAP hOldmap = (HBITMAP)SelectObject(hMemdc, hBitmap); // memdc에 hBit 형식의 그림을 그리기 위해서 사용
 
-	SelectObject(memdc, hOld);
-	DeleteObject(hBit);
-	DeleteDC(memdc);
-	ReleaseDC(hwnd, hdc);
-	InvalidateRect(hwnd, NULL, FALSE);
+	SetStretchBltMode(hScrdc, COLORONCOLOR);
+	StretchBlt(hMemdc, 0, 0, rct.right-rct.left, rct.bottom-rct.top, hScrdc, 0, 0, rct.right - rct.left, rct.bottom - rct.top, SRCCOPY);
+	//PrintWindow(hwnd, hMemdc, 0);
 
-	return b;
-}
-
-/*
-HBITMAP ScreenCapture(void)
-{
-	// 메인 모니터의 해상도를 구한다.
-	int ScreenWidth = GetSystemMetrics(SM_CXSCREEN);
-	int ScreenHeight = GetSystemMetrics(SM_CYSCREEN);
-
-	HDC hScrDC, hMemDC;
-	HBITMAP hBitmap;
-
-	// 화면 DC와 스크린샷을 저장할 비트맵을 생성한다.
-	hScrDC = CreateDC("DISPLAY", NULL, NULL, NULL);
-	hMemDC = CreateCompatibleDC(hScrDC);
-	hBitmap = CreateCompatibleBitmap(hScrDC, ScreenWidth, ScreenHeight);
-	SelectObject(hMemDC, hBitmap);
-
-	// 현재 화면을 비트맵으로 복사한다.
-	BitBlt(hMemDC, 0, 0, ScreenWidth, ScreenHeight, hScrDC, 0, 0, SRCCOPY);
-
-	DeleteDC(hMemDC);
-	DeleteDC(hScrDC);
+	SelectObject(hMemdc, hOldmap);
+	//DeleteObject(hBitmap);
+	DeleteDC(hMemdc);
+	DeleteDC(hScrdc);
+	ReleaseDC(hwnd, hScrdc);
 
 	return hBitmap;
 }
 
+/*
 void FindPID(void) {
 	HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 	if (hSnapshot == INVALID_HANDLE_VALUE) {
