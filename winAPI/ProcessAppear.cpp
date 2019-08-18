@@ -44,8 +44,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR lpszCmdLine, int nCmdSh
 	RegisterClass(&WndClass);
 
 	WndClass.lpfnWndProc = WndEmpty;
-	WndClass.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
-	WndClass.lpszClassName = _T("EmptyWindow");
+	WndClass.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
+	WndClass.lpszClassName = _T("DisplayWindow");
 	
 	RegisterClass(&WndClass);
 
@@ -123,13 +123,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 			break;
 		case 0106:
 			// 윈도우를 찾을 때마다 EnumWindowsProc 호출
-			//EnumWindows(EnumWindowCapture, NULL);
-			g_hwnd = FindWindow(NULL, _T("캡처 도구"));
-			GetClientRect(g_hwnd, &rct); // 현재 윈도우의 좌표값을 받아온다
-			CreateWindow("EmptyWindow", "EmptyWindow", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-				CW_USEDEFAULT, CW_USEDEFAULT, rct.right - rct.left, rct.bottom - rct.top,
-				NULL, (HMENU)NULL, hInst, NULL);
-			hBit = WindowCapture(g_hwnd);
+			EnumWindows(EnumWindowCapture, NULL);
+			//g_hwnd = FindWindow(NULL, _T("캡처 도구"));
+			//GetClientRect(g_hwnd, &rct); // 현재 윈도우의 좌표값을 받아온다
+			//CreateWindow("DisplayWindow", "DisplayWindow", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+			//	CW_USEDEFAULT, CW_USEDEFAULT, rct.right - rct.left, rct.bottom - rct.top,
+			//	NULL, (HMENU)NULL, hInst, NULL);
+			//hBit = WindowCapture(g_hwnd);
 			break;
 		case 0107:
 			// pid = GetCurrentProcessId();
@@ -203,9 +203,17 @@ BOOL CALLBACK EnumWindowRestore(HWND hwnd, LPARAM lParam) {
 }
 
 BOOL CALLBACK EnumWindowCapture(HWND hwnd, LPARAM lParam) {
-	if (IsWindowVisible(hwnd)) {
-		hBit = WindowCapture(hwnd);
-	}
+	if (!IsWindowVisible(hwnd))
+		return TRUE;
+	char caption[255];
+	GetWindowText(hwnd, caption, sizeof(caption));
+	g_hwnd = FindWindow(NULL, caption);
+	GetClientRect(g_hwnd, &rct); // 현재 윈도우의 좌표값을 받아온다
+	CreateWindow("DisplayWindow", caption, WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+		CW_USEDEFAULT, CW_USEDEFAULT, rct.right - rct.left, rct.bottom - rct.top,
+		NULL, (HMENU)NULL, hInst, NULL);
+	hBit = WindowCapture(g_hwnd);
+	
 	return TRUE; // 계속 열거하려면 TRUE를 반환해야 한다
 }
 
@@ -218,9 +226,10 @@ HBITMAP WindowCapture(HWND hwnd) {
 	HBITMAP hBitmap = CreateCompatibleBitmap(hScrdc, rct.right, rct.bottom);
 	HBITMAP hOldmap = (HBITMAP)SelectObject(hMemdc, hBitmap); // memdc에 hBit 형식의 그림을 그리기 위해서 사용
 
-	SetStretchBltMode(hScrdc, COLORONCOLOR);
-	StretchBlt(hMemdc, 0, 0, rct.right-rct.left, rct.bottom-rct.top, hScrdc, 0, 0, rct.right - rct.left, rct.bottom - rct.top, SRCCOPY);
-	//PrintWindow(hwnd, hMemdc, 0);
+	BitBlt(hMemdc, 0, 0, rct.right-rct.left, rct.bottom-rct.top, hScrdc, 0, 0, SRCCOPY);
+	//SetStretchBltMode(hScrdc, COLORONCOLOR);
+	//StretchBlt(hMemdc, 0, 0, rct.right-rct.left, rct.bottom-rct.top, hScrdc, 0, 0, rct.right - rct.left, rct.bottom - rct.top, SRCCOPY);
+	//PrintWindow(hwnd, hMemdc, 0); 창의 타이틀바까지 캡처함
 
 	SelectObject(hMemdc, hOldmap);
 	//DeleteObject(hBitmap);
