@@ -46,7 +46,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR lpszCmdLine, int nCmdSh
 	WndClass.lpfnWndProc = WndEmpty;
 	WndClass.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
 	WndClass.lpszClassName = _T("DisplayWindow");
-	
+
 	RegisterClass(&WndClass);
 
 	hwnd = CreateWindow(lpszClass, lpszClass, WS_OVERLAPPEDWINDOW,
@@ -73,65 +73,73 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 		CreateWindow(_T("button"), _T("MAX"),
 			WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
 			20, 20, 100, 30,
-			hwnd, (HMENU)0101, hInst, NULL);
+			hwnd, (HMENU)01, hInst, NULL);
 		CreateWindow(_T("button"), _T("RESTORE"),
 			WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
 			20, 60, 100, 30,
-			hwnd, (HMENU)0102, hInst, NULL);
+			hwnd, (HMENU)02, hInst, NULL);
 		CreateWindow(_T("button"), _T("MIN"),
 			WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
 			20, 100, 100, 30,
-			hwnd, (HMENU)0103, hInst, NULL);
+			hwnd, (HMENU)03, hInst, NULL);
 		CreateWindow(_T("button"), _T("MIN ALL"),
 			WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
 			20, 140, 100, 30,
-			hwnd, (HMENU)0104, hInst, NULL);
+			hwnd, (HMENU)04, hInst, NULL);
 		CreateWindow(_T("button"), _T("RESTORE ALL"),
 			WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
 			20, 180, 100, 30,
-			hwnd, (HMENU)0105, hInst, NULL);
-		CreateWindow(_T("button"), _T("CAPTURE"),
+			hwnd, (HMENU)05, hInst, NULL);
+		CreateWindow(_T("button"), _T("CAPTURE ALL"),
 			WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
 			20, 220, 100, 30,
-			hwnd, (HMENU)0106, hInst, NULL);
-		CreateWindow(_T("button"), _T("CLOSE"),
+			hwnd, (HMENU)06, hInst, NULL);
+		CreateWindow(_T("button"), _T("EMPTY"),
 			WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
 			20, 260, 100, 30,
-			hwnd, (HMENU)0107, hInst, NULL);
+			hwnd, (HMENU)07, hInst, NULL);
+		CreateWindow(_T("button"), _T("CLOSE"),
+			WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+			20, 300, 100, 30,
+			hwnd, (HMENU)10, hInst, NULL);
 		break;
 	case WM_COMMAND:
 		switch (LOWORD(wParam)) {
-		case 0101:
+		case 01:
 			// ShowWindow(hwnd, SW_SHOWMAXIMIZED);
 			SendMessage(hwnd, WM_SYSCOMMAND, SC_MAXIMIZE, 0);
 			break;
-		case 0102:
+		case 02:
 			// ShowWindow(hwnd, SW_RESTORE);
 			SendMessage(hwnd, WM_SYSCOMMAND, SC_RESTORE, 0);
 			break;
-		case 0103:
-			// ShowWindow(hwnd, SW_SHOWMINIMIZED);
+		case 03:
+			//ShowWindow(hwnd, SW_SHOWMINIMIZED);
+			//PostMessage(hwnd, WM_SHOWWINDOW, FALSE, SW_OTHERUNZOOM);
 			SendMessage(hwnd, WM_SYSCOMMAND, SC_MINIMIZE, 0);
 			break;
-		case 0104:
+		case 04:
 			// 윈도우를 찾을 때마다 EnumWindowsProc 호출
 			EnumWindows(EnumWindowMinimize, NULL);
 			break;
-		case 0105:
+		case 05:
 			// 윈도우를 찾을 때마다 EnumWindowsProc 호출
 			EnumWindows(EnumWindowRestore, NULL);
 			break;
-		case 0106:
+		case 06:
 			// 윈도우를 찾을 때마다 EnumWindowsProc 호출
 			EnumWindows(EnumWindowCapture, NULL);
-			//g_hwnd = FindWindow(NULL, _T("캡처 도구"));
+			break;
+		case 07:
+			// 캡션명을 입력하면 그에 따른 윈도우 호출
+			//g_hwnd = FindWindow(NULL, _T("WinAPI - Microsoft Visual Studio"));
 			//GetClientRect(g_hwnd, &rct); // 현재 윈도우의 좌표값을 받아온다
 			//CreateWindow("DisplayWindow", "DisplayWindow", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
 			//	CW_USEDEFAULT, CW_USEDEFAULT, rct.right - rct.left, rct.bottom - rct.top,
 			//	NULL, (HMENU)NULL, hInst, NULL);
 			//hBit = WindowCapture(g_hwnd);
 			break;
-		case 0107:
+		case 10:
 			// pid = GetCurrentProcessId();
 			// Process = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
 			// CreateRemoteThread(hProcess, 0, 0, 0, ExitProcess, 0, 0);
@@ -165,16 +173,22 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 LRESULT CALLBACK WndEmpty(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 	HDC hdc, memdc;
 	BITMAP bmp;
+	HBITMAP hOld;
 	PAINTSTRUCT ps;
+
+	InvalidateRect(hwnd, NULL, TRUE);
+	UpdateWindow(hwnd);
 
 	switch (iMsg) {
 	case WM_PAINT:
 		hdc = BeginPaint(hwnd, &ps);
 		if (hBit != NULL) {
 			memdc = CreateCompatibleDC(hdc);
-			SelectObject(memdc, hBit);
+			hOld = (HBITMAP)SelectObject(memdc, hBit);
 			GetObject(hBit, sizeof(BITMAP), &bmp);
 			BitBlt(hdc, 0, 0, bmp.bmWidth, bmp.bmHeight, memdc, 0, 0, SRCCOPY);
+			SelectObject(memdc, hOld);
+			ReleaseDC(hwnd, hdc);
 			DeleteDC(memdc);
 		}
 		EndPaint(hwnd, &ps);
@@ -189,7 +203,11 @@ LRESULT CALLBACK WndEmpty(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 }
 
 BOOL CALLBACK EnumWindowMinimize(HWND hwnd, LPARAM lParam) {
-	if (IsWindowVisible(hwnd)) { // 찾은 윈도우가 화면에 보이는 윈도우라면
+	char caption[255];
+	GetWindowText(hwnd, caption, sizeof(caption));
+	if (IsWindowVisible(hwnd) && strcmp(caption, _T("MainWindow"))) { // 찾은 윈도우가 화면에 보이는 윈도우라면
+		//ShowWindow(hwnd, SW_SHOWMINIMIZED);
+		//PostMessage(hwnd, WM_SHOWWINDOW, FALSE, SW_OTHERUNZOOM);
 		SendMessage(hwnd, WM_SYSCOMMAND, SC_MINIMIZE, 0);
 	}
 	return TRUE; // 계속 열거하려면 TRUE를 반환해야 한다
@@ -203,17 +221,23 @@ BOOL CALLBACK EnumWindowRestore(HWND hwnd, LPARAM lParam) {
 }
 
 BOOL CALLBACK EnumWindowCapture(HWND hwnd, LPARAM lParam) {
-	if (!IsWindowVisible(hwnd))
-		return TRUE;
 	char caption[255];
-	GetWindowText(hwnd, caption, sizeof(caption));
-	g_hwnd = FindWindow(NULL, caption);
-	GetClientRect(g_hwnd, &rct); // 현재 윈도우의 좌표값을 받아온다
-	CreateWindow("DisplayWindow", caption, WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-		CW_USEDEFAULT, CW_USEDEFAULT, rct.right - rct.left, rct.bottom - rct.top,
-		NULL, (HMENU)NULL, hInst, NULL);
-	hBit = WindowCapture(g_hwnd);
+	int len = GetWindowTextLength(hwnd);
 	
+	GetWindowText(hwnd, caption, sizeof(caption));
+
+	if (IsWindowVisible(hwnd) && (len > 0) && (!IsIconic(hwnd)) && strcmp(caption, _T("Program Manager"))
+		&& strcmp(caption, _T("NVIDIA GeForce Overlay")) && strcmp(caption, _T("MainWindow"))) {
+		SetWindowPos(hwnd, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+		g_hwnd = FindWindow(NULL, _T(caption));
+		GetClientRect(g_hwnd, &rct); // 현재 윈도우의 좌표값을 받아온다
+		CreateWindow("DisplayWindow", caption, WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+			CW_USEDEFAULT, CW_USEDEFAULT, rct.right - rct.left, rct.bottom - rct.top,
+			NULL, (HMENU)NULL, hInst, NULL);
+		hBit = WindowCapture(g_hwnd);
+		SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+		SendMessage(hwnd, WM_SYSCOMMAND, SC_MINIMIZE, NULL);
+	}
 	return TRUE; // 계속 열거하려면 TRUE를 반환해야 한다
 }
 
@@ -226,17 +250,15 @@ HBITMAP WindowCapture(HWND hwnd) {
 	HBITMAP hBitmap = CreateCompatibleBitmap(hScrdc, rct.right, rct.bottom);
 	HBITMAP hOldmap = (HBITMAP)SelectObject(hMemdc, hBitmap); // memdc에 hBit 형식의 그림을 그리기 위해서 사용
 
-	BitBlt(hMemdc, 0, 0, rct.right-rct.left, rct.bottom-rct.top, hScrdc, 0, 0, SRCCOPY);
+	BitBlt(hMemdc, 0, 0, rct.right - rct.left, rct.bottom - rct.top, hScrdc, 0, 0, SRCCOPY);
 	//SetStretchBltMode(hScrdc, COLORONCOLOR);
 	//StretchBlt(hMemdc, 0, 0, rct.right-rct.left, rct.bottom-rct.top, hScrdc, 0, 0, rct.right - rct.left, rct.bottom - rct.top, SRCCOPY);
-	//PrintWindow(hwnd, hMemdc, 0); 창의 타이틀바까지 캡처함
+	//PrintWindow(hwnd, hMemdc, PW_CLIENTONLY);
 
 	SelectObject(hMemdc, hOldmap);
-	//DeleteObject(hBitmap);
-	DeleteDC(hMemdc);
-	DeleteDC(hScrdc);
 	ReleaseDC(hwnd, hScrdc);
-
+	DeleteDC(hMemdc);
+	
 	return hBitmap;
 }
 
