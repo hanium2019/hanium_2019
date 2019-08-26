@@ -3,11 +3,7 @@
 #include <windows.h>
 #include <iostream>
 
-#ifdef UNICODE
-#pragma comment(linker, "/entry:wWinMainCRTStartup /subsystem:console") 
-#else
 #pragma comment(linker, "/entry:WinMainCRTStartup /subsystem:console") 
-#endif
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam);
 
