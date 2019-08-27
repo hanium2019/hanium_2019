@@ -2,10 +2,13 @@
 #include <tchar.h>
 #include <windows.h>
 #include <time.h>
+#include "resource.h"
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam);
 
 LRESULT CALLBACK WndEmpty(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam);
+
+LRESULT CALLBACK WndScroll(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam);
 
 //LRESULT CALLBACK WndVideo(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam);
 
@@ -48,6 +51,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR lpszCmdLine, int nCmdSh
 
 	RegisterClass(&WndClass);
 
+	WndClass.lpfnWndProc = WndScroll;
+	WndClass.hbrBackground = (HBRUSH)GetStockObject(WHITE_BRUSH);
+	WndClass.lpszClassName = _T("ScrollWindow");
+
+	RegisterClass(&WndClass);
+
 	/*WndClass.lpfnWndProc = WndVideo;
 	WndClass.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
 	WndClass.lpszClassName = _T("VideoWindow");
@@ -69,6 +78,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR lpszCmdLine, int nCmdSh
 }
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
+	HDC hdc;
 	PAINTSTRUCT ps;
 	//HANDLE hProcess;
 	//DWORD pid;
@@ -144,7 +154,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 			//hBit = WindowCapture(g_hwnd);
 			break;
 		case 07:
-			CreateWindow("DisplayWindow", "Empty Window", WS_OVERLAPPEDWINDOW | WS_VISIBLE | WS_VSCROLL,
+			CreateWindow("ScrollWindow", "Scroll Test", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
 				CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
 				NULL, (HMENU)NULL, hInst, NULL);
 			break;
@@ -169,7 +179,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 			break;
 		}
 	case WM_PAINT:
-		BeginPaint(hwnd, &ps);
+		hdc = BeginPaint(hwnd, &ps);
 		EndPaint(hwnd, &ps);
 		break;
 	case WM_DESTROY:
@@ -179,15 +189,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 	return DefWindowProc(hwnd, iMsg, wParam, lParam);
 }
 
-HBITMAP hBit = NULL;
-
-HWND hScroll = NULL;
-
-int scroll = 0;
-
-HWND g_hwnd;
-
-RECT rct;
+HBITMAP hBitmap = NULL;
 
 LRESULT CALLBACK WndEmpty(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 	HDC hdc, memdc;
@@ -196,32 +198,12 @@ LRESULT CALLBACK WndEmpty(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 	PAINTSTRUCT ps;
 
 	switch (iMsg) {
-	case WM_CREATE:
-		hScroll = CreateWindow("Scrollbar", NULL, WS_CHILD | WS_VISIBLE | SBS_VERT,
-			10, 10, 20, 500, hwnd, (HMENU)0, hInst, NULL);
-		SetScrollRange(hScroll, SB_CTL, 0, 100, FALSE);
-		SetScrollPos(hScroll, SB_CTL, 0, FALSE);
-		hBit = ScreenCapture(hwnd);
-	case WM_MOUSEWHEEL:
-		if ((SHORT)HIWORD(wParam) > 0) { // 휠이 앞으로 돌아갈 때
-			if(scroll > 0) scroll--;
-			SetScrollPos(hScroll, SB_CTL, scroll, TRUE);
-			MessageBox(hwnd, _T("마우스 올림"), _T("Wheel Test"), NULL);
-			break;
-		}
-		else if ((SHORT)HIWORD(wParam) < 0) { // 휠이 뒤로 돌아갈 때
-			if (scroll < 255) scroll++;
-			SetScrollPos(hScroll, SB_CTL, scroll, TRUE);
-			MessageBox(hwnd, _T("마우스 내림"), _T("Wheel Test"), NULL);
-			break;
-		}
-		break;
 	case WM_PAINT:
 		hdc = BeginPaint(hwnd, &ps);
-		if (hBit != NULL) {
+		if (hBitmap != NULL) {
 			memdc = CreateCompatibleDC(hdc);
-			hOld = (HBITMAP)SelectObject(memdc, hBit);
-			GetObject(hBit, sizeof(BITMAP), &bmp);
+			hOld = (HBITMAP)SelectObject(memdc, hBitmap);
+			GetObject(hBitmap, sizeof(BITMAP), &bmp);
 			BitBlt(hdc, 0, 0, bmp.bmWidth, bmp.bmHeight, memdc, 0, 0, SRCCOPY);
 			SelectObject(memdc, hOld);
 			//DeleteObject(memdc);
@@ -230,13 +212,85 @@ LRESULT CALLBACK WndEmpty(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 		EndPaint(hwnd, &ps);
 		break;
 	case WM_DESTROY:
-		if (hBit != NULL)
-			DeleteObject(hBit);
+		if (hBitmap != NULL)
+			DeleteObject(hBitmap);
 		PostQuitMessage(0);
 		break;
 	}
 	return DefWindowProc(hwnd, iMsg, wParam, lParam);
 }
+
+HBITMAP hBimo;
+
+RECT crt, rt;
+
+int inc = 0;
+int pos = 0; // 전역으로 하지 않을 경우 스크롤 이벤트 발생X
+int max = 100; // 전역으로 하지 않을 경우 창의 끝을 무시하고 계속 아래로 내려감
+
+LRESULT CALLBACK WndScroll(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
+	HDC hdc, memdc;
+	PAINTSTRUCT ps;
+
+	int lines;
+	TCHAR str[128];
+
+	switch (iMsg) {
+	case WM_CREATE:
+		hBimo = LoadBitmap(hInst, MAKEINTRESOURCE(BIMO));
+		break;
+	case WM_SIZE:
+		max = 20 * 100 - HIWORD(lParam); // 창의 하단에 맞춰서 스크롤 끝 지정
+		SetScrollRange(hwnd, SB_VERT, 0, max, TRUE); // 스크롤 범위 설정
+		SetScrollPos(hwnd, SB_VERT, 0, TRUE); // 스크롤 초기값 설정
+		break;
+	case WM_MOUSEWHEEL:
+		SystemParametersInfo(SPI_GETWHEELSCROLLLINES, 0, &lines, 0);
+		for (int i = 0; i < lines; i++) {
+			if ((SHORT)HIWORD(wParam) > 0) // 휠이 앞으로 돌아갈 때
+				inc = -lines * 20;
+			//MessageBox(hScroll, _T("마우스 올림"), _T("Wheel Test"), NULL);
+			else if ((SHORT)HIWORD(wParam) < 0)
+				inc = lines * 20;
+			//MessageBox(hScroll, _T("마우스 내림"), _T("Wheel Test"), NULL);
+		}
+
+		if (pos + inc < 0)
+			inc = -pos;
+		if (pos + inc > max)
+			inc = max - pos;
+		pos += inc;
+
+		GetClientRect(hwnd, &crt);
+		SetRect(&rt, 150, 100, crt.right, crt.bottom); // RECT 구조체의 좌표를 새로 지정해서 rt에 저장
+		ScrollWindow(hwnd, 0, -inc, &rt, &rt);
+		SetScrollPos(hwnd, SB_VERT, pos, TRUE);
+
+		//InvalidateRect(hwnd, &rt, FALSE);
+		UpdateWindow(hwnd);
+		break;
+	case WM_PAINT:
+		hdc = BeginPaint(hwnd, &ps);
+		memdc = CreateCompatibleDC(hdc);
+		SelectObject(memdc, hBimo);
+		BitBlt(hdc, 0, 0, 500, 500, memdc, 0, 0, SRCCOPY);
+		/*for (int i = 0; i < 100; i++) { // 텍스트는 제대로 출력된다
+			wsprintf(str, _T("Line Number : %d"), i);
+			TextOut(hdc, 150, i * 20 - pos, str, lstrlen(str));
+		}*/
+		DeleteDC(memdc);
+		EndPaint(hwnd, &ps);
+
+		break;
+	case WM_DESTROY:
+		if (hBitmap != NULL)
+			DeleteObject(hBitmap);
+		PostQuitMessage(0);
+		break;
+	}
+	return DefWindowProc(hwnd, iMsg, wParam, lParam);
+}
+
 /*
 HWND hwndVideo;
 
@@ -259,6 +313,7 @@ LRESULT CALLBACK WndVideo(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 	return DefWindowProc(hwnd, iMsg, wParam, lParam);
 }
 */
+
 BOOL CALLBACK EnumWindowMinimize(HWND hwnd, LPARAM lParam) {
 	char caption[255];
 	GetWindowText(hwnd, caption, sizeof(caption));
@@ -277,6 +332,10 @@ BOOL CALLBACK EnumWindowRestore(HWND hwnd, LPARAM lParam) {
 	return TRUE; // 계속 열거하려면 TRUE를 반환해야 한다
 }
 
+HWND g_hwnd;
+
+RECT rct;
+
 BOOL CALLBACK EnumWindowCapture(HWND hwnd, LPARAM lParam) {
 	HWND l_hwnd;
 	char caption[255];
@@ -293,7 +352,7 @@ BOOL CALLBACK EnumWindowCapture(HWND hwnd, LPARAM lParam) {
 		l_hwnd = CreateWindow("DisplayWindow", caption, WS_OVERLAPPEDWINDOW | WS_VISIBLE,
 			CW_USEDEFAULT, CW_USEDEFAULT, rct.right, rct.bottom,
 			NULL, (HMENU)NULL, hInst, NULL);
-		hBit = WindowCapture(g_hwnd);
+		hBitmap = WindowCapture(g_hwnd);
 		//SetWindowPos(g_hwnd, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_HIDEWINDOW);
 		//SendMessage(g_hwnd, WM_SYSCOMMAND, SC_MINIMIZE, NULL);
 		//ShowWindow(g_hwnd, SW_HIDE);
@@ -307,26 +366,26 @@ BOOL CALLBACK EnumWindowCapture(HWND hwnd, LPARAM lParam) {
 HBITMAP WindowCapture(HWND hwnd) {
 	HDC hScrdc = GetDC(hwnd);
 	HDC hMemdc = CreateCompatibleDC(hScrdc); // hdc와 호환되는 memdc 생성
-	HBITMAP hBitmap = NULL;
-	HBITMAP hOldmap = NULL;
+	HBITMAP hBit = NULL;
+	HBITMAP hOld = NULL;
 
 	// 비트맵이 남아 있으면 지운다
-	if (hBitmap) DeleteObject(hBitmap);
+	if (hBit) DeleteObject(hBit);
 
 	// hdc와 호환되는 비트맵 hBit 생성
-	hBitmap = CreateCompatibleBitmap(hScrdc, rct.right, rct.bottom);
-	hOldmap = (HBITMAP)SelectObject(hMemdc, hBitmap); // memdc에 hBit 형식의 그림을 그리기 위해서 사용
+	hBit = CreateCompatibleBitmap(hScrdc, rct.right, rct.bottom);
+	hOld = (HBITMAP)SelectObject(hMemdc, hBit); // memdc에 hBit 형식의 그림을 그리기 위해서 사용
 
 	BitBlt(hMemdc, 0, 0, rct.right, rct.bottom, hScrdc, 0, 0, SRCCOPY);
 	//SetStretchBltMode(hScrdc, COLORONCOLOR);
 	//StretchBlt(hMemdc, 0, 0, rct.right-rct.left, rct.bottom-rct.top, hScrdc, 0, 0, rct.right - rct.left, rct.bottom - rct.top, SRCCOPY);
 	//PrintWindow(hwnd, hMemdc, PW_CLIENTONLY);
 
-	SelectObject(hMemdc, hOldmap);
+	SelectObject(hMemdc, hOld);
 	ReleaseDC(hwnd, hScrdc);
 	DeleteDC(hMemdc);
 
-	return hBitmap;
+	return hBit;
 }
 
 HBITMAP ScreenCapture(HWND hwnd) {
@@ -341,9 +400,9 @@ HBITMAP ScreenCapture(HWND hwnd) {
 	BitBlt(hMemdc, 0, 0, ScreenWidth, ScreenHeight, hScrdc, 0, 0, SRCCOPY);
 
 	SelectObject(hMemdc, hOld);
-	ReleaseDC(hwnd, hMemdc);
-	DeleteDC(hScrdc);
-	InvalidateRect(hwnd, NULL, TRUE);
+	ReleaseDC(hwnd, hScrdc);
+	DeleteDC(hMemdc);
+
 	return hBit;
 }
 
