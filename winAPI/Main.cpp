@@ -4,6 +4,8 @@
 #include <time.h>
 #include "resource.h"
 
+#pragma comment(linker, "/entry:WinMainCRTStartup /subsystem:console")
+
 LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam);
 
 LRESULT CALLBACK WndEmpty(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam);
@@ -220,67 +222,69 @@ LRESULT CALLBACK WndEmpty(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 	return DefWindowProc(hwnd, iMsg, wParam, lParam);
 }
 
-HBITMAP hBimo;
+HBITMAP hBimo = NULL;
+HBITMAP hOldBimo;
 
 RECT crt, rt;
 
-int inc = 0;
-int pos = 0; // 전역으로 하지 않을 경우 스크롤 이벤트 발생X
-int max = 100; // 전역으로 하지 않을 경우 창의 끝을 무시하고 계속 아래로 내려감
+int inc;
+int pos; // 전역으로 하지 않을 경우 스크롤 이벤트 발생X
+int max; // 전역으로 하지 않을 경우 창의 끝을 무시하고 계속 아래로 내려감
+int temp;
 
 LRESULT CALLBACK WndScroll(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 	HDC hdc, memdc;
 	PAINTSTRUCT ps;
+	BITMAP bmp;
 
 	int lines;
 	TCHAR str[128];
 
 	switch (iMsg) {
 	case WM_CREATE:
-		hBimo = LoadBitmap(hInst, MAKEINTRESOURCE(BIMO));
+		hBimo = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_BITMAP1));
 		break;
 	case WM_SIZE:
-		max = 20 * 100 - HIWORD(lParam); // 창의 하단에 맞춰서 스크롤 끝 지정
+		max = 10 * 100 - HIWORD(lParam); // 창의 하단에 맞춰서 스크롤 끝 지정
 		SetScrollRange(hwnd, SB_VERT, 0, max, TRUE); // 스크롤 범위 설정
 		SetScrollPos(hwnd, SB_VERT, 0, TRUE); // 스크롤 초기값 설정
+		break;
+	case WM_LBUTTONDOWN:
+		InvalidateRect(hwnd, &rt, TRUE);
+		UpdateWindow(hwnd);
 		break;
 	case WM_MOUSEWHEEL:
 		SystemParametersInfo(SPI_GETWHEELSCROLLLINES, 0, &lines, 0);
 		for (int i = 0; i < lines; i++) {
 			if ((SHORT)HIWORD(wParam) > 0) // 휠이 앞으로 돌아갈 때
-				inc = -lines * 20;
+				inc = -lines * 10; // 휠을 한번 올릴 때 10줄 만큼 inc 감소
 			//MessageBox(hScroll, _T("마우스 올림"), _T("Wheel Test"), NULL);
 			else if ((SHORT)HIWORD(wParam) < 0)
-				inc = lines * 20;
+				inc = lines * 10; // 휠을 한번 내릴 때 10줄 만큼 inc 증가
 			//MessageBox(hScroll, _T("마우스 내림"), _T("Wheel Test"), NULL);
 		}
 
+		// 썸이 밖으로 나가지 않게끔 막아줌
 		if (pos + inc < 0)
 			inc = -pos;
 		if (pos + inc > max)
 			inc = max - pos;
-		pos += inc;
+		pos += inc; // 썸의 위치를 inc 만큼 변경
 
-		GetClientRect(hwnd, &crt);
-		SetRect(&rt, 150, 100, crt.right, crt.bottom); // RECT 구조체의 좌표를 새로 지정해서 rt에 저장
-		ScrollWindow(hwnd, 0, -inc, &rt, &rt);
-		SetScrollPos(hwnd, SB_VERT, pos, TRUE);
-
-		//InvalidateRect(hwnd, &rt, FALSE);
-		UpdateWindow(hwnd);
+		GetClientRect(hwnd, &crt); // 현재 윈도우의 RECT 구조체 선언
+		SetRect(&rt, 100, 100, crt.right, crt.bottom); // RECT 구조체의 width, height을 새로 지정
+		ScrollWindow(hwnd, 0, -inc, &rt, &rt); // SetRect로 정해준 범위를 제외하고 스크롤 할 수 있게 함
+		SetScrollPos(hwnd, SB_VERT, pos, TRUE); // 썸의 위치를 pos의 위치에 맞춰서 변경
 		break;
 	case WM_PAINT:
 		hdc = BeginPaint(hwnd, &ps);
 		memdc = CreateCompatibleDC(hdc);
-		SelectObject(memdc, hBimo);
-		BitBlt(hdc, 0, 0, 500, 500, memdc, 0, 0, SRCCOPY);
-		/*for (int i = 0; i < 100; i++) { // 텍스트는 제대로 출력된다
-			wsprintf(str, _T("Line Number : %d"), i);
-			TextOut(hdc, 150, i * 20 - pos, str, lstrlen(str));
-		}*/
+		hOldBimo = (HBITMAP)SelectObject(memdc, hBimo);
+		GetObject(hBimo, sizeof(BITMAP), &bmp);
+		BitBlt(hdc, 0, -pos, bmp.bmWidth, bmp.bmHeight, memdc, 0, 0, SRCCOPY); // pos의 현재 위치에 따라서 이미지를 그려줌(스크롤시 화면이 올라가거나 내려가는 것처럼 보이는 효과 발생)
+		SelectObject(memdc, hOldBimo);
 		DeleteDC(memdc);
 		EndPaint(hwnd, &ps);
-
 		break;
 	case WM_DESTROY:
 		if (hBitmap != NULL)
