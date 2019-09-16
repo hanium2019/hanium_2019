@@ -4,15 +4,13 @@
 #include <time.h>
 #include "resource.h"
 
-#pragma comment(linker, "/entry:WinMainCRTStartup /subsystem:console")
+//#pragma comment(linker, "/entry:WinMainCRTStartup /subsystem:console")
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam);
 
 LRESULT CALLBACK WndEmpty(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam);
 
 LRESULT CALLBACK WndScroll(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam);
-
-//LRESULT CALLBACK WndVideo(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam);
 
 BOOL CALLBACK EnumWindowMinimize(HWND hwnd, LPARAM lParam);
 
@@ -59,12 +57,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR lpszCmdLine, int nCmdSh
 
 	RegisterClass(&WndClass);
 
-	/*WndClass.lpfnWndProc = WndVideo;
-	WndClass.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
-	WndClass.lpszClassName = _T("VideoWindow");
-
-	RegisterClass(&WndClass);*/
-
 	hwnd = CreateWindow(lpszClass, lpszClass, WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
 		NULL, (HMENU)NULL, hInstance, NULL);
@@ -82,8 +74,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR lpszCmdLine, int nCmdSh
 LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 	HDC hdc;
 	PAINTSTRUCT ps;
-	//HANDLE hProcess;
-	//DWORD pid;
 
 	switch (iMsg) {
 	case WM_CREATE:
@@ -132,7 +122,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 			break;
 		case 03:
 			//ShowWindow(hwnd, SW_SHOWMINIMIZED);
-			//PostMessage(hwnd, WM_SHOWWINDOW, FALSE, SW_OTHERUNZOOM);
 			SendMessage(hwnd, WM_SYSCOMMAND, SC_MINIMIZE, 0);
 			break;
 		case 04:
@@ -146,14 +135,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 		case 06:
 			// 윈도우를 찾을 때마다 EnumWindowsProc 호출
 			EnumWindows(EnumWindowCapture, NULL);
-			//EnumWindows(ShowEnumWindow, NULL);
-			// 캡션명을 입력하면 그에 따른 윈도우 호출
-			//g_hwnd = FindWindow(NULL, _T("WinAPI - Microsoft Visual Studio"));
-			//GetClientRect(g_hwnd, &rct); // 현재 윈도우의 좌표값을 받아온다
-			//CreateWindow("DisplayWindow", "DisplayWindow", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-			//	CW_USEDEFAULT, CW_USEDEFAULT, rct.right - rct.left, rct.bottom - rct.top,
-			//	NULL, (HMENU)NULL, hInst, NULL);
-			//hBit = WindowCapture(g_hwnd);
 			break;
 		case 07:
 			CreateWindow("ScrollWindow", "Scroll Test", WS_OVERLAPPEDWINDOW | WS_VISIBLE,
@@ -164,7 +145,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 			// pid = GetCurrentProcessId();
 			// Process = OpenProcess(PROCESS_ALL_ACCESS, FALSE, pid);
 			// CreateRemoteThread(hProcess, 0, 0, 0, ExitProcess, 0, 0);
-			// 부모가 아닌 독립적인 관계여도 닫기는 공유
 			SendMessage(hwnd, WM_SYSCOMMAND, SC_CLOSE, 0);
 			break;
 		}
@@ -223,14 +203,13 @@ LRESULT CALLBACK WndEmpty(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 }
 
 HBITMAP hBimo = NULL;
-HBITMAP hOldBimo;
+HBITMAP hOldBimo = NULL;
 
 RECT crt, rt;
 
 int inc;
 int pos; // 전역으로 하지 않을 경우 스크롤 이벤트 발생X
 int max; // 전역으로 하지 않을 경우 창의 끝을 무시하고 계속 아래로 내려감
-int temp;
 
 LRESULT CALLBACK WndScroll(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 	HDC hdc, memdc;
@@ -245,7 +224,7 @@ LRESULT CALLBACK WndScroll(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 		hBimo = LoadBitmap(hInst, MAKEINTRESOURCE(IDB_BITMAP1));
 		break;
 	case WM_SIZE:
-		max = 10 * 100 - HIWORD(lParam); // 창의 하단에 맞춰서 스크롤 끝 지정
+		max = 20 * 100 - HIWORD(lParam); // 창의 하단에 맞춰서 스크롤 끝 지정(max = 20*100)
 		SetScrollRange(hwnd, SB_VERT, 0, max, TRUE); // 스크롤 범위 설정
 		SetScrollPos(hwnd, SB_VERT, 0, TRUE); // 스크롤 초기값 설정
 		break;
@@ -260,7 +239,7 @@ LRESULT CALLBACK WndScroll(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 				inc = -lines * 10; // 휠을 한번 올릴 때 10줄 만큼 inc 감소
 			//MessageBox(hScroll, _T("마우스 올림"), _T("Wheel Test"), NULL);
 			else if ((SHORT)HIWORD(wParam) < 0)
-				inc = lines * 10; // 휠을 한번 내릴 때 10줄 만큼 inc 증가
+				inc = lines * 20; // 휠을 한번 내릴 때 10줄 만큼 inc 증가
 			//MessageBox(hScroll, _T("마우스 내림"), _T("Wheel Test"), NULL);
 		}
 
@@ -281,7 +260,9 @@ LRESULT CALLBACK WndScroll(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 		memdc = CreateCompatibleDC(hdc);
 		hOldBimo = (HBITMAP)SelectObject(memdc, hBimo);
 		GetObject(hBimo, sizeof(BITMAP), &bmp);
-		BitBlt(hdc, 0, -pos, bmp.bmWidth, bmp.bmHeight, memdc, 0, 0, SRCCOPY); // pos의 현재 위치에 따라서 이미지를 그려줌(스크롤시 화면이 올라가거나 내려가는 것처럼 보이는 효과 발생)
+
+		// pos의 현재 위치에 따라서 이미지를 그려줌(스크롤시 화면이 올라가거나 내려가는 것처럼 보이는 효과 발생)
+		BitBlt(hdc, 0, -pos, bmp.bmWidth, bmp.bmHeight, memdc, 0, 0, SRCCOPY); 
 		SelectObject(memdc, hOldBimo);
 		DeleteDC(memdc);
 		EndPaint(hwnd, &ps);
@@ -295,35 +276,10 @@ LRESULT CALLBACK WndScroll(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
 	return DefWindowProc(hwnd, iMsg, wParam, lParam);
 }
 
-/*
-HWND hwndVideo;
-
-LRESULT CALLBACK WndVideo(HWND hwnd, UINT iMsg, WPARAM wParam, LPARAM lParam) {
-	switch(iMsg) {
-	case WM_LBUTTONDOWN:
-		if (hwndVideo) {
-			MCIWndClose(hwndVideo);
-			MCIWndDestroy(hwndVideo);
-			hwndVideo = 0;
-		}
-		hwndVideo = MCIWndCreate(hwnd, hInst, MCIWNDF_NOTIFYMODE | MCIWNDF_NOTIFYPOS, "Saturn.wmv");
-		if (hwndVideo)
-			MCIWndPlay(hwndVideo);
-		break;
-	case WM_DESTROY:
-		PostQuitMessage(0);
-		break;
-	}
-	return DefWindowProc(hwnd, iMsg, wParam, lParam);
-}
-*/
-
 BOOL CALLBACK EnumWindowMinimize(HWND hwnd, LPARAM lParam) {
 	char caption[255];
 	GetWindowText(hwnd, caption, sizeof(caption));
 	if (IsWindowVisible(hwnd) && strcmp(caption, _T("MainWindow"))) { // 찾은 윈도우가 화면에 보이는 윈도우라면
-		//ShowWindow(hwnd, SW_SHOWMINIMIZED);
-		//PostMessage(hwnd, WM_SHOWWINDOW, FALSE, SW_OTHERUNZOOM);
 		SendMessage(hwnd, WM_SYSCOMMAND, SC_MINIMIZE, 0);
 	}
 	return TRUE; // 계속 열거하려면 TRUE를 반환해야 한다
@@ -409,35 +365,3 @@ HBITMAP ScreenCapture(HWND hwnd) {
 
 	return hBit;
 }
-
-/*
-BOOL CALLBACK ShowEnumWindow(HWND hwnd, LPARAM lParam) {
-	char caption[255];
-	int len = GetWindowTextLength(hwnd);
-
-	GetWindowText(hwnd, caption, sizeof(caption));
-
-	if ((len > 0) && (!IsIconic(hwnd)) && strcmp(caption, _T("Program Manager"))
-		&& strcmp(caption, _T("NVIDIA GeForce Overlay")) && strcmp(caption, _T("MainWindow"))) {
-		SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
-	}
-	return TRUE;
-}
-
-void FindPID(void) {
-	HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-	if (hSnapshot == INVALID_HANDLE_VALUE) {
-		printf("Invalid Snapshot Handle\n");
-		exit(EXIT_FAILURE);
-	}
-	PROCESSENTRY32 PE32; // 프로세스에 대한 정보를 담는 변수
-	PE32.dwSize = sizeof(PE32); // PE32의 구조체 크기 정의
-	if (Process32First(hSnapshot, &PE32)) {
-		do {
-			printf("%s, [%d]\n", PE32.szExeFile, PE32.th32ProcessID); // name of process, PID
-		} while (Process32Next(hSnapshot, &PE32));
-	}
-	CloseHandle(hSnapshot);
-	return;
-}
-*/
