@@ -34,7 +34,11 @@ By using AR and VR to visually arrange information in 3-dimensional space and sh
 |<center>Web </center> | <center>박영준 이호찬 </center> |*Node.js, database, Javascript, socket.io*|<center>[Web](https://github.com/hanium2019/hanium_2019/blob/master/web/webreadme.md) </center> |
 |<center>Unity </center> |<center>김수빈 김민수</center> |*LeapMotion, Oculus*|<center>[Oculus Unity](https://github.com/hanium2019/hanium_2019/blob/master/Oculus_Unity/Oculus_Unity.md), [Leap Motion](https://github.com/hanium2019/hanium_2019/blob/master/leapMotion/leapMotion.md)</center> |
 <<<<<<< HEAD
+<<<<<<< HEAD
 |<center>WinAPI </center>|<center>김세진 송진호</center> |*WinAPI 프로세스 사용 코드 분석*|<center>[WinAPI](https://github.com/hanium2019/hanium_2019/blob/master/winAPI/WinAPI.md)</center> |
+=======
+|<center>WinAPI </center>|<center>김세진 송진호</center> |*WinAPI 프로세스 사용 코드 분석*|<center>[WinAPI](https://github.com/hanium2019/hanium_2019/blob/master/WinAPI/WinApi.md)</center> |
+>>>>>>> 49a6ee8b3f4a18a0399c8b31397932f23764877f
 =======
 |<center>WinAPI </center>|<center>김세진 송진호</center> |*WinAPI 프로세스 사용 코드 분석*|<center>[WinAPI](https://github.com/hanium2019/hanium_2019/blob/master/WinAPI/WinApi.md)</center> |
 >>>>>>> 49a6ee8b3f4a18a0399c8b31397932f23764877f
