@@ -1,4 +1,0 @@
-이미지 캡처 문제점
-1. 창 크기를 늘였다가 줄였다가 하면 잔상이 남음
-2. 각각의 윈도우를 캡처할 때는 문제가 없지만 다음 윈도우를 캡처하면 전에 캡처했던 윈도우를 가려버림
-3. Microsoft Word, Microsoft Stroe, 브라우저(Chrome, Microsoft Edge, Internet Explorer) 등의 일부 프로그램은 캡처가 안된다
