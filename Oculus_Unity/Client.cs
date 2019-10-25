@@ -109,4 +109,13 @@ public class Client : MonoBehaviour
             Debug.Log(e.ToString());
         }
     }
+
+    // 입력
+    private Text displayed;
+    private InputField newone;
+    void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.Return))
+            displayed.text = newone.ToString();
+    }
 }

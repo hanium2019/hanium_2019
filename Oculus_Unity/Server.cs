@@ -108,7 +108,7 @@ public class Server : MonoBehaviour
         handler.Close();
     }
 
-    // 입력 . . .
+    // 입력
     private Text displayed;
     private InputField newone;
     void Update() {
