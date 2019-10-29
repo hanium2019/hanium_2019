@@ -10,6 +10,10 @@ AR과 VR을 이용해 3차원 공간에 정보들을 시각적으로 배치하�
 AR-based real-time screen sharing conference system.
 By using AR and VR to visually arrange information in 3-dimensional space and sharing it in real time, it facilitates communication between each other and saves unnecessary time for delivering the contents of the meeting.
 
+##### ARConferenceFront https://github.com/hanium2019/ARConferenceFront
+##### ARConferenceBack https://github.com/hanium2019/ARConferenceBack
+
+
 ## 👨‍💻프로젝트 주요 내용
 
  ● Win API를 활용한 회의 자료를 3D 공간화 하여 AR로 출력
