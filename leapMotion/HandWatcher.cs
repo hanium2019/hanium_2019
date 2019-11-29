@@ -2,33 +2,32 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using Leap.Unity.Examples;
 using Leap.Unity;
 using Leap;
 
 public class HandWatcher : MonoBehaviour
 {
     public GameObject mainCamera;
-    //public GameObject capsuleHandRight;
-    //public GameObject capsuleHandLeft;
     public HandModelBase rightHandModel;
     public HandModelBase leftHandModel;
     public Leap.Hand rightHand;
     public Leap.Hand leftHand;
-    public ProximityDetector rightProximityDetector;
-    public ProximityDetector leftProximityDetector;
     
-    
-    public int leftHandState; // extend : 0, pinch : 1, grasp : 2, push : 3, pull : 4
+    public int leftHandState; // extend : 0, pinch : 1, grasp : 2, push : 3, pull : 4, left : 5, right : 6
     public int rightHandState;
-    public int windowState; // on : 1, off : 0
+    public int windowState = 0; // off : 0, normal(collapsed) : 1, spread : 2
 
     public float pinchStrengthForce = 0.85f;
     public float grabStrengthForce = 0.15f;
     public float onoffVelocity = 0.6f;
+    public float buttonDistance = 0.025f;
     public Vector3 offset;
     
-
+    public GameObject dynamicUI;
     public TrailRenderer rightHandTrail;
+    public ParticleSystem rightPalmParticle;
+    public ParticleSystem leftPalmParticle;
     public GameObject windowBase;
     public GameObject[] windows;
     private IEnumerator rightHandCoroutine;
@@ -40,7 +39,6 @@ public class HandWatcher : MonoBehaviour
     {
         rightHandCoroutine = rightHandWatcher();
         leftHandCoroutine = leftHandWatcher();
-        //text = GameObject.Find("Text").GetComponent<Text>();
         
     }
 
@@ -60,13 +58,25 @@ public class HandWatcher : MonoBehaviour
         StopCoroutine(leftHandCoroutine);
     }
 
+    private bool workstationActivated = false;
+
     private IEnumerator rightHandWatcher() {
       while (true){
         if (rightHandModel != null){
             rightHand = rightHandModel.GetLeapHand();
             if (rightHand != null){
-                //Debug.Log(rightProximityDetector.CurrentObject);
-                //if (rightHand.GrabStrength >= 0.85f)  Debug.Log("Right Grabbing");
+                if (rightHand.Fingers[1].IsExtended) {
+                    if (leftHand != null) {
+                        if ( Vector3.Distance(leftHand.PalmPosition.ToVector3(), rightHand.Fingers[1].TipPosition.ToVector3()) < buttonDistance ) {
+                            LeanTween.move(dynamicUI, leftHand.PalmPosition.ToVector3(), 0.2f);
+                            if (!workstationActivated) {
+                                dynamicUI.GetComponent<WorkstationBehaviourExample>().ActivateWorkstation();
+                                workstationActivated = true;
+                            }
+                        }
+                    }                    
+                }
+
                 if (rightHandState != 0 && rightHand.PinchStrength >= pinchStrengthForce) {
                     //Debug.Log("Right Pinching");
                     rightHandState = 1;
@@ -76,9 +86,11 @@ public class HandWatcher : MonoBehaviour
                     //Debug.Log("Right AllExtend");
                     rightHandState = 2;
                     rightHandTrail.emitting = false;
+                    
                 } else {
                     offset = Vector3.zero;
                     rightHandState = 0;
+                    rightHandTrail.emitting = false;
                 }
 
                 if (rightHandState == 2) {
@@ -89,6 +101,13 @@ public class HandWatcher : MonoBehaviour
                         //Debug.Log("Right Window TurnOn");
                         rightHandState = 4;
                     }
+                    if (rightHand.PalmVelocity.x <= -onoffVelocity) {
+                        rightHandState = 5;
+                        //Debug.Log("Left");
+                    } else if (rightHand.PalmVelocity.x >= onoffVelocity) {
+                        rightHandState = 6;
+                    }
+
                 }
             }
         }
@@ -112,6 +131,10 @@ public class HandWatcher : MonoBehaviour
                 } else {
                     offset = Vector3.zero;
                     leftHandState = 0;
+                    if (workstationActivated) {
+                        dynamicUI.GetComponent<WorkstationBehaviourExample>().DeactivateWorkstation();
+                        workstationActivated = false;
+                    }
                 }
 
                 if (leftHandState == 2) {
@@ -122,6 +145,12 @@ public class HandWatcher : MonoBehaviour
                         //Debug.Log("Left Window TurnOn");
                         leftHandState = 4;
                     }
+                    if (leftHand.PalmVelocity.x <= -onoffVelocity) {
+                        leftHandState = 5;
+                        //Debug.Log("Left");
+                    } else if (leftHand.PalmVelocity.x >= onoffVelocity) {
+                        leftHandState = 6;
+                    }
                 }
             }
         }
@@ -129,23 +158,88 @@ public class HandWatcher : MonoBehaviour
       }
     }
 
+    public void ParticleControl(int flag, bool isRight) {
+        if (flag == 0) {
+            if (isRight)
+                rightPalmParticle.Stop();
+            else 
+                leftPalmParticle.Stop();
+        }   
+        else {
+            if (isRight)
+                rightPalmParticle.Play();
+            else 
+                leftPalmParticle.Play();
+        }
+
+        switch(flag) {
+            case 0:
+                break;
+            case 1:
+                rightPalmParticle.startColor = new Color(1f, 0f, 0f, 0.35f);
+                leftPalmParticle.startColor = new Color(1f, 0f, 0f, 0.35f);
+                break;
+            case 2:
+                rightPalmParticle.startColor = new Color(0f, 1f, 0f, 0.35f);
+                leftPalmParticle.startColor = new Color(0f, 1f, 0f, 0.35f);
+                break;
+            case 3:
+                rightPalmParticle.startColor = new Color(0f, 0f, 1f, 0.35f);
+                leftPalmParticle.startColor = new Color(0f, 0f, 1f, 0.35f);
+                break;
+
+        }
+    }
+
+    public void TrailOn() {
+        rightHandTrail.enabled = true;
+    }
+    
+    public void TrailOff() {
+        rightHandTrail.enabled = false;
+    }
+
+    public void TrailErase() {
+        rightHandTrail.time = 0;
+        Invoke("TrailErase2", 0.2f);
+    }
+
+    private void TrailErase2() {
+        rightHandTrail.time = 600;
+        Debug.Log("erased");
+    }
+    
+
     // Update is called once per frame
     void Update()
     {
         
         if (rightHandState == 4 && leftHandState == 4) {
             if (windowState == 0) {
-                captureManager.MakeAll();
+                //captureManager.MakeAll();
                 captureManager.ShowAll();
                 windowState = 1;
             }
         }
         else if (rightHandState == 3 && leftHandState == 3) {
-            if (windowState == 1) {
+            if (windowState != 0) {
                 captureManager.HideAll();
                 windowState = 0;
             }
-        }
+        } 
+        else if (rightHandState == 6 && leftHandState == 5) {
+            if (windowState != 0) {
+                captureManager.SpreadAll();
+                windowState = 2;
+            }
+        } 
+        else if (rightHandState == 5 && leftHandState == 6) {
+            if (windowState == 1) {
+                captureManager.CollapseAll();
+                windowState = 1;
+            }
+        } 
+        
         
     }
 }
