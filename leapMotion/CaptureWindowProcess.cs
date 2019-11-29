@@ -8,11 +8,15 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
+using PPT = Microsoft.Office.Interop.PowerPoint;
 
+using Microsoft.Office.Core;
 public class CaptureWindowProcess : MonoBehaviour
 {
+    
+    #region User32Importing
 
-    private class User32
+    public class User32
     {
         [StructLayout(LayoutKind.Sequential)]
         public struct RECT
@@ -47,78 +51,233 @@ public class CaptureWindowProcess : MonoBehaviour
         [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
         public static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
         [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)] 
-        public static extern int GetWindowTextLength(IntPtr hWnd); 
+        public static extern int GetWindowTextLength(IntPtr hWnd);
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        public static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
+        [DllImport("user32.dll")]
+        public static extern int SetScrollPos(IntPtr hWnd, int nBar, int nPos, bool bRedraw);
+
+        [DllImport("user32.dll")]
+        public static extern int GetScrollPos(IntPtr hwnd, int nBar);
+
+    }
+    #endregion
+
+/*
+    const Int32 WM_VSCROLL = 0x0115;
+    private const int SB_LINEUP = 0; // Scrolls one line up
+    private const int SB_LINELEFT = 0;// Scrolls one cell left
+    private const int SB_LINEDOWN = 1; // Scrolls one line down
+    private const int SB_LINERIGHT = 1;// Scrolls one cell right
+    private const int SB_PAGEUP = 2; // Scrolls one page up
+    private const int SB_PAGELEFT = 2;// Scrolls one page left
+    private const int SB_PAGEDOWN = 3; // Scrolls one page down
+    private const int SB_PAGERIGTH = 3; // Scrolls one page right
+    private const int SB_PAGETOP = 6; // Scrolls to the upper left
+    private const int SB_LEFT = 6; // Scrolls to the left
+    private const int SB_PAGEBOTTOM = 7; // Scrolls to the upper right
+    private const int SB_RIGHT = 7; // Scrolls to the right
+    private const int SB_ENDSCROLL = 8; // Ends scroll
+
+    //private void ScrollWindow(IntPtr hwnd)
+    //{
+    //    User32.SendMessage(hwnd, WM_VSCROLL,  (IntPtr)SB_LINEDOWN, IntPtr.Zero);
+    //    User32.SendMessage(hwnd, WM_VSCROLL, (IntPtr)SB_PAGEDOWN, IntPtr.Zero);
+    //}
+*/
+
+    public User32.RECT rect_Target;
+    User32.RECT[] rect_Notepad = new User32.RECT[10];
+    User32.RECT[] rect_MSPaintApp = new User32.RECT[10];
+    User32.RECT[] rect_PPTFrameClass = new User32.RECT[10];
+    User32.RECT[] rect_ChromeWidgetWin1 = new User32.RECT[10];
+    User32.RECT[] rect_IEFrame = new User32.RECT[10];
+    User32.RECT[] rect_ApplicationFrameWindow = new User32.RECT[10];
+    
+    User32.RECT[] rect_All = new User32.RECT[50];
+
+    public IntPtr hTarget;
+    IntPtr[] hNotepad;
+    IntPtr[] hMSPaintApp;
+    IntPtr[] hPPTFrameClass;
+    IntPtr[] hChromeWidgetWin1;
+    IntPtr[] hIEFrame;
+    IntPtr[] hApplicationFrameWindow;
+    IntPtr[] hAll = new IntPtr[50];
+    
+    public HandWatcher handWatcher;
+    
+    public GameObject mainCamera;
+    public GameObject[] windowObject = new GameObject[50];
+    
+    int WindowObjectIndex = 0;
+
+
+    
+    /// <summary> Detect specific processes and store its handles to memory </summary>                             
+    /// To add processes to detect, add lines in the following format:                                             
+    /// [ProcessHandleArrayName] = ProcessClassNameToHandleArray("[ProcessHandleClassName]", ref [rect_Process])   
+    void GetProcessHandle() {  
+        hNotepad = ProcessClassNameToHandleArray("notepad", ref rect_Notepad);
+        hMSPaintApp = ProcessClassNameToHandleArray("mspaintapp", ref rect_MSPaintApp);
+        hPPTFrameClass= ProcessClassNameToHandleArray("PPTFrameClass", ref rect_PPTFrameClass);
+        hChromeWidgetWin1 = ProcessClassNameToHandleArray("Chrome_WidgetWin_1", ref rect_ChromeWidgetWin1);
+        hIEFrame = ProcessClassNameToHandleArray("IEFrame", ref rect_IEFrame);
+        hApplicationFrameWindow = ProcessClassNameToHandleArray("ApplicationFrameWindow", ref rect_ApplicationFrameWindow);
+        //
+
+    }    
+
+    /// <summary> Create objects using all stored process handles </summary>                                           
+    /// To add objects to create, add lines in the following format:                                                   
+    /// ProcessHandleClassToUnityObject([ProcessHandleArrayName], [rect_Process], [flag], "[ProcessHandleClassName]")  
+    /// -flag : 0 -> Handle -> Bitmap -> Texture2D,      
+    ///         1 -> Handle -> Bitmap -> Image File(.PNG) -> Texture2D  
+    public void MakeAll() {
+        WindowObjectIndex = 0;
+        ProcessHandleClassToUnityObject(hNotepad, rect_Notepad, 0, "Notepad");
+        ProcessHandleClassToUnityObject(hMSPaintApp, rect_MSPaintApp, 0, "MSPaintApp");
+        ProcessHandleClassToUnityObject(hPPTFrameClass, rect_PPTFrameClass, 0, "PPTFrameClass");
+        ProcessHandleClassToUnityObject(hChromeWidgetWin1, rect_ChromeWidgetWin1, 0, "ChromeWidgetWin1");
+        ProcessHandleClassToUnityObject(hIEFrame, rect_IEFrame, 0, "IEFrame");
+        ProcessHandleClassToUnityObject(hApplicationFrameWindow, rect_ApplicationFrameWindow, 0, "WindowUICore");
+
+        for (int j = 0; j < 30; j++) {
+            if (j < WindowObjectIndex) {
+                windowObject[j].GetComponent<MeshRenderer>().enabled = true;
+            } else {
+                windowObject[j].GetComponent<MeshRenderer>().enabled = false;
+            }
+        }
+    }
+
+    /// <summary> Create png files using process handles </summary>                                           
+    /// To add png files to create, add lines in the following format:                                                   
+    /// ProcessHandleClassToImagefiles([ProcessHandleArrayName], [rect_Process], "FileName", "FileType(png is recommended")  
+    void AllHandleClassesToImageFiles() // Capture Process and Save to PNG file
+    {
+        ProcessHandleClassToImagefiles(hNotepad, rect_Notepad, "Notepad", "png");
+        ProcessHandleClassToImagefiles(hMSPaintApp, rect_MSPaintApp, "MSPaintApp", "png");
+        ProcessHandleClassToImagefiles(hChromeWidgetWin1, rect_ChromeWidgetWin1, "ChromeWidgetWin1", "png");
+        ProcessHandleClassToImagefiles(hIEFrame, rect_IEFrame, "IEFrame", "png");
+        ProcessHandleClassToImagefiles(hPPTFrameClass, rect_PPTFrameClass, "PPTFrameClass", "png");
+        ProcessHandleClassToImagefiles(hApplicationFrameWindow, rect_ApplicationFrameWindow, "WindowUICore", "png");
     }
 
     
 
-    User32.RECT[] notepadRect = new User32.RECT[10];
-    User32.RECT[] msPaintRect = new User32.RECT[10];
-    User32.RECT[] powerPointerRect = new User32.RECT[10];
-    User32.RECT[] chromeWidgetWin1Rect = new User32.RECT[10];
-    User32.RECT[] iEFrameRect = new User32.RECT[10];
-    IntPtr unityHandle;
-    IntPtr[] hNotepad;// = FindWindowWithClassName("notepad", ref notepadRect);
-    IntPtr[] hMSPaintApp;// = FindWindowWithClassName("mspaintapp", ref notepadRect);
-    IntPtr[] hPPTFrameClass;// = FindWindowWithClassName("PPTFrameClass", ref powerPointerRect);
-    IntPtr[] hChromeWidgetWin1;// = FindWindowWithClassName("Chrome_WidgetWin_1", ref chromeWidgetWin1Rect);
-    IntPtr[] hIEFrame;// = FindWindowWithClassName("IEFrame", ref chromeWidgetWin1Rect);
+    /// <summary> Trace the Handle corresponding to the currently selected Object and save the handle and rect in hTarget and rect_Target respectively. </summary>
+    /// To add object to detext, add lines in the following format:                                                   
+    /// HandleArrayIndexing([ProcessHandleArrayName], [rect_Process], nTmp);
+    int refreshTargetIndex;
+    public void FindTargetHandle(GameObject obj) {
+        string strTmp = Regex.Replace(obj.name, @"\D", ""); 
+        int nTmp = int.Parse(strTmp);
+        refreshTargetIndex = 0;
+        
+        hTarget = hAll[nTmp];
+        rect_Target = rect_All[nTmp];
+        /*
+        HandleArrayIndexing(hNotepad, rect_Notepad, nTmp);
+        HandleArrayIndexing(hMSPaintApp, rect_MSPaintApp, nTmp);
+        HandleArrayIndexing(hPPTFrameClass, rect_PPTFrameClass, nTmp);
+        HandleArrayIndexing(hChromeWidgetWin1, rect_ChromeWidgetWin1, nTmp);
+        HandleArrayIndexing(hIEFrame, rect_IEFrame, nTmp);
+        HandleArrayIndexing(hApplicationFrameWindow, rect_ApplicationFrameWindow, nTmp);
+        */
 
-    int index = 0;
-
-    void SetProcessForeground(IntPtr[] handle) { // 프로세스를 포어그라운드로 가져오기
-        for(int i = 0; handle[i] != IntPtr.Zero; i++) {
-            User32.ShowWindowAsync(handle[i], 1);
-            //User32.SetWindowPos(handle[i],  -2, 0, 0, 0, 0, 0x1 | 0x2);
-        }
+        captureCoroutine = Refresh(obj, nTmp);
     }
 
-    void GetProcessHandle() // 프로세스 핸들 전체 가져오기
-    { 
-        hNotepad = FindWindowWithClassName("notepad", ref notepadRect);
-        hMSPaintApp = FindWindowWithClassName("mspaintapp", ref msPaintRect);
-        hPPTFrameClass= FindWindowWithClassName("PPTFrameClass", ref powerPointerRect);
-        hChromeWidgetWin1 = FindWindowWithClassName("Chrome_WidgetWin_1", ref chromeWidgetWin1Rect);
-        hIEFrame = FindWindowWithClassName("IEFrame", ref iEFrameRect);
-    }
 
-    private IntPtr[] FindWindowWithClassName(string className, ref User32.RECT[] rect) {
+
+
+    #region Internal
+
+    /// <summary> Returns the handle and rect size of all processes that use a particular process class name. </summary>                             
+    /// Use the User32.FindWindowEx function to sequentially search for a process handle using [className] 
+    /// and add it to the array to be returned if there is nothing wrong with the name and rect.
+    /// If there are no more processes using [className], return an array.
+    private IntPtr[] ProcessClassNameToHandleArray(string className, ref User32.RECT[] rect) {
         IntPtr hProcessCheck = User32.FindWindow(className, null);
         IntPtr[] hProcess = new IntPtr[10];
         for(int i = 0; hProcessCheck != IntPtr.Zero; i++) {
-            if ( User32.GetWindowTextLength(hProcessCheck) >= 1 ) {
+            // If no process name exists, the handle is not used.
+            if ( User32.GetWindowTextLength(hProcessCheck) >= 1 ) { 
                 hProcess[i] = hProcessCheck;
                 User32.GetWindowRect(hProcess[i], ref rect[i]);
-                Debug.Log(className + i + " " + rect[i].left + " " + rect[i].right  + " " + rect[i].top + " " + rect[i].bottom );
+                // If there is an error in the position or size of the process, the handle is not used.
+                if ( (rect[i].left == 0 && rect[i].top == 0) || 
+                      rect[i].top == 1 || rect[i].top == 8 || rect[i].top == rect[i].bottom ||
+                      rect[i].left < -30000) { 
+                    hProcess[i] = IntPtr.Zero;
+                    i--;
+                } else {
+                    Debug.Log(className + i + " " + rect[i].left + " " + rect[i].right  + " " + rect[i].top + " " + rect[i].bottom );
+                }
             } else {
                 i--;
             }
+            // Put the next process handle using [className] into hProcessCheck.
             hProcessCheck = User32.FindWindowEx(IntPtr.Zero, hProcessCheck, className, null);
         }
         return hProcess;
     }
 
-    public Image CaptureScreen()
-    {
-        return CaptureWindow( User32.GetDesktopWindow() );
+    /// <summary> Set the texture using the process handle and the object's position and scale using the rect. </summary>                             
+    /// screenWidth and screenHeight are needed to position each process window similar to the layout on the monitor.
+    /// Their position or size ratio can be changed by adjusting the float numbers.
+    int screenWidth = 1920;
+    int screenHeight = 1080;
+    private void ProcessHandleClassToUnityObject(IntPtr[] handle, User32.RECT[] rect, int flag, string className) {
+        for (int j = 0; j < 10; j++) {
+            if (handle[j] != IntPtr.Zero) {
+                // Set position and scale
+                windowObject[WindowObjectIndex].transform.position = new Vector3(   ((rect[j].left+rect[j].right)*0.5f-screenWidth/2)*0.0005f,  // x position
+                                                                                   -((rect[j].top+rect[j].bottom)*0.5f-screenHeight/2)*0.0005f, // y position
+                                                                                    0.4f + 0.025f*(WindowObjectIndex+1)     );                  // z position
+                windowObject[WindowObjectIndex].transform.localScale = new Vector3( (rect[j].left-rect[j].right)*0.0004f,                       // x scale
+                                                                                    (rect[j].top-rect[j].bottom)*0.0004f,                       // y scale
+                                                                                    0.001f  );                                                  // z scale
+                
+                // Set texture
+                if (flag == 0) 
+                    windowObject[WindowObjectIndex].GetComponent<MeshRenderer>().material.mainTexture = ProcessHandleToTexture2D(handle[j], rect[j]);
+                else
+                    windowObject[WindowObjectIndex].GetComponent<MeshRenderer>().material.mainTexture = LoadTextureFromFile(className + "_" +  j + ".png");
+                
+                hAll[WindowObjectIndex] = handle[j];
+                rect_All[WindowObjectIndex] = rect[j];
+                WindowObjectIndex++;
+            } 
+        }
     }
     
-
-    public System.Drawing.Bitmap CaptureWindow(IntPtr hWnd)
-    {
-        System.Drawing.Rectangle rctForm = System.Drawing.Rectangle.Empty;
-        using (System.Drawing.Graphics grfx = System.Drawing.Graphics.FromHdc(User32.GetWindowDC(hWnd)))
-        {
-            rctForm = System.Drawing.Rectangle.Round(grfx.VisibleClipBounds);
+    
+    /// <summary> Takes a process handle and a rect as arguments and returns a Texture2D of that size. </summary>           
+    public Texture2D ProcessHandleToTexture2D(IntPtr handle, User32.RECT rect) {
+        if (handle != IntPtr.Zero) {
+            Bitmap bmp = ProcessHandleToBitmap(handle, rect);
+            Texture2D texture = BitmapToTexture2D(bmp);
+            return texture;
         }
-        System.Drawing.Bitmap pImage = new System.Drawing.Bitmap(rctForm.Width, rctForm.Height);
+        else {
+            return null;
+        }
+    }
+
+    /// <summary> Takes a process handle and a rect as arguments and returns a Bitmap of that size. </summary>     
+    private System.Drawing.Bitmap ProcessHandleToBitmap(IntPtr hWnd, User32.RECT rect)
+    {
+        System.Drawing.Bitmap pImage = new System.Drawing.Bitmap(rect.right-rect.left, rect.bottom-rect.top);
         System.Drawing.Graphics graphics = System.Drawing.Graphics.FromImage(pImage);
         IntPtr hDC = graphics.GetHdc();
-        //paint control onto graphics using provided options        
 
         try
         {
-            User32.PrintWindow(hWnd, hDC, 0x1);
+            //The PrintWindow function is more convenient than the BitBlt function, but it is resource intensive.
+            //BitBlt is recommended for continuous output, such as video output.
+            User32.PrintWindow(hWnd, hDC, 0x2);
         }
         finally
         {
@@ -128,189 +287,25 @@ public class CaptureWindowProcess : MonoBehaviour
         return pImage;
     }
 
-    public GameObject[] windowObject = new GameObject[50];
-    public GameObject windowBase;
-
-    public void CaptureWindowToFile(IntPtr handle, string filename)
-    {
-        Image img = CaptureWindow(handle);
-        img.Save(filename);
-    }
-
-    void Capture() // 프로세스 캡쳐해서 저장하기
-    {
-        print("Captured");
-        
-        CaptureMultipleWindowsToFile(hNotepad, "Notepad", "png");
-        CaptureMultipleWindowsToFile(hMSPaintApp, "MSPaint", "png");
-        CaptureMultipleWindowsToFile(hChromeWidgetWin1, "ChromeWidgetWin1", "png");
-        CaptureMultipleWindowsToFile(hIEFrame, "IEFrame", "png");
-        CaptureMultipleWindowsToFile(hPPTFrameClass, "PowerPointer", "png");
-    }
-
-    private void CaptureMultipleWindowsToFile(IntPtr[] handle, string className, string fileFormatName) 
+    /// <summary> Bitmap To Texture conversion of memory record and load method </summary>
+    /// To prevent crashes in continuous playback in the build version, Need to use BitBlt or manage MemoryStream
+    Texture2D BitmapToTexture2D(Bitmap bmp) // 비트맵 변수로부터 텍스처2D 생성
     {
-        for(int i = 0; handle[i] != IntPtr.Zero; i++) {
-            CaptureWindowToFile(handle[i], className + "_" + i + "." + fileFormatName);
-        }
-    }
-    
-    private IEnumerator captureCoroutine;
-    private IntPtr hRefresh;
+        MemoryStream ms = new MemoryStream();
+        bmp.Save(ms, ImageFormat.Png); 
+        var buffer = new byte[ms.Length];
+        ms.Position = 0;
+        ms.Read(buffer,0,buffer.Length);
+        Texture2D texture = new Texture2D(1,1);
+        texture.LoadImage(buffer);
 
-    public void RefreshTarget(GameObject obj) {
-        string strTmp = Regex.Replace(obj.name, @"\D", ""); 
-        int nTmp = int.Parse(strTmp);
-        int index = 0;
-        for (int i = 0; i < 10; i++) {
-            if (hNotepad[i] != IntPtr.Zero) {
-                if (nTmp == index) {
-                    hRefresh = hNotepad[i];
-                }
-                index++;
-            }
-        }
-        for (int i = 0; i < 10; i++) {
-            if (hMSPaintApp[i] != IntPtr.Zero) {
-                if (nTmp == index) {
-                    hRefresh = hMSPaintApp[i];
-                }
-                index++;
-            }
-        }
-        for (int i = 0; i < 10; i++) {
-            if (hPPTFrameClass[i] != IntPtr.Zero) {
-                if (nTmp == index) {
-                    hRefresh = hPPTFrameClass[i];
-                }
-                index++;
-            }
-        }
-        for (int i = 0; i < 10; i++) {
-            if (hChromeWidgetWin1[i] != IntPtr.Zero) {
-                if (nTmp == index) {
-                    hRefresh = hChromeWidgetWin1[i];
-                }
-                index++;
-            }
-        }
-        for (int i = 0; i < 10; i++) {
-            if (hIEFrame[i] != IntPtr.Zero) {
-                if (nTmp == index) {
-                    hRefresh = hIEFrame[i];
-                }
-                index++;
-            }
-        }
-        Debug.Log(nTmp + " " + hRefresh);
-        
-        captureCoroutine = Refresh(obj, nTmp);
+        return texture;
     }
 
-    public void RefreshStart() {
-        StartCoroutine(captureCoroutine);
-        Debug.Log("asdf");
-    }
-
-    public void RefreshStop() {
-        if (captureCoroutine != null)
-            StopCoroutine(captureCoroutine);
-    }
-
-    private IEnumerator Refresh(GameObject obj, int index) {
-        while(true) {
-            try {
-                CaptureWindowToFile(hRefresh, "refresh.png");
-            }
-            catch {
-
-            }
-            windowObject[index].GetComponent<MeshRenderer>().material.mainTexture = LoadTextureFromFile("refresh.png");
-            yield return new WaitForSeconds(0.1f);
-        }
-    }
-
-    public void ShowAll() {
-        for (int j = 0; j < index; j++) {
-            LeanTween.alpha(windowObject[j], 0.7f, 0.4f);
-        }
-        Debug.Log("asdf");
-    }
-
-    public void HideAll() {
-        for (int j = 0; j < index; j++) {
-            LeanTween.alpha(windowObject[j],0f,0.4f);
-            //LeanTween.
-            
-        }
-        Debug.Log("fasdf");
-    }
-
-
-    public void MakeAll() {
-        index = 0;
-        //GetProcessHandle();
-        //Capture();
-        for (int j = 0; j < 10; j++) {
-            if (hNotepad[j] != IntPtr.Zero) {
-                //windowObject[index] = (GameObject) Instantiate(windowBase, new Vector3((notepadRect[j].left)*0.0004f, (notepadRect[j].top)*0.0004f, 0.5f), Quaternion.identity) as GameObject;
-                windowObject[index].transform.position = new Vector3((notepadRect[j].left-400)*0.0004f, (notepadRect[j].top-150)*0.001f, 0.4f + 0.01f*(index+1));
-                windowObject[index].transform.localScale = new Vector3((notepadRect[j].left-notepadRect[j].right)*0.0004f, (notepadRect[j].top-notepadRect[j].bottom)*0.0004f, 0.001f);
-                windowObject[index].GetComponent<MeshRenderer>().material.mainTexture = LoadTextureFromFile("Notepad_" + j + ".png");
-                index++;
-            } 
-        }
-        for (int j = 0; j < 10; j++) {
-            if (hMSPaintApp[j] != IntPtr.Zero) {
-                //windowObject[index] = (GameObject) Instantiate(windowBase, new Vector3((msPaintRect[j].left)*0.0004f, (msPaintRect[j].top)*0.0004f, 0.5f), Quaternion.identity) as GameObject;
-                windowObject[index].transform.position = new Vector3((msPaintRect[j].left-400)*0.001f, (msPaintRect[j].top-150)*0.001f, 0.4f + 0.01f*(index+1));
-                windowObject[index].transform.localScale = new Vector3((msPaintRect[j].left-msPaintRect[j].right)*0.0004f, (msPaintRect[j].top-msPaintRect[j].bottom)*0.0004f, 0.001f); 
-                windowObject[index].GetComponent<MeshRenderer>().material.mainTexture = LoadTextureFromFile("MSPaint_" + j + ".png");
-                index++;
-            }
-        }
-        for (int j = 0; j < 10; j++) {
-            if (hPPTFrameClass[j] != IntPtr.Zero) {
-                //windowObject[index] = (GameObject) Instantiate(windowBase, new Vector3((powerPointerRect[j].left)*0.0004f, (powerPointerRect[j].top)*0.0004f, 0.5f), Quaternion.identity) as GameObject;
-                windowObject[index].transform.position = new Vector3((powerPointerRect[j].left-400)*0.001f, (powerPointerRect[j].top-150)*0.001f, 0.4f + 0.01f*(index+1));
-                windowObject[index].transform.localScale = new Vector3((powerPointerRect[j].left-powerPointerRect[j].right)*0.0004f, (powerPointerRect[j].top-powerPointerRect[j].bottom)*0.0004f, 0.001f); 
-                windowObject[index].GetComponent<MeshRenderer>().material.mainTexture = LoadTextureFromFile("PowerPointer_" + j + ".png");
-                index++;
-            }
-        }
-        for (int j = 0; j < 10; j++) {
-            if (hChromeWidgetWin1[j] != IntPtr.Zero) {
-                //windowObject[index] = (GameObject) Instantiate(windowBase, new Vector3((chromeWidgetWin1Rect[j].left)*0.0004f, (chromeWidgetWin1Rect[j].top)*0.0004f, 0.5f), Quaternion.identity) as GameObject;
-                windowObject[index].transform.position = new Vector3((chromeWidgetWin1Rect[j].left-400)*0.001f, (chromeWidgetWin1Rect[j].top-150)*0.001f, 0.4f + 0.01f*(index+1));
-                windowObject[index].transform.localScale = new Vector3((chromeWidgetWin1Rect[j].left-chromeWidgetWin1Rect[j].right)*0.0004f, (chromeWidgetWin1Rect[j].top-chromeWidgetWin1Rect[j].bottom)*0.0004f, 0.001f); 
-                windowObject[index].GetComponent<MeshRenderer>().material.mainTexture = LoadTextureFromFile("ChromeWidgetWin1_" + j + ".png");
-                index++;
-            }
-        }
-        for (int j = 0; j < 10; j++) {
-            if (hIEFrame[j] != IntPtr.Zero) {
-                //windowObject[index] = (GameObject) Instantiate(windowBase, new Vector3((iEFrameRect[j].left)*0.0004f, (iEFrameRect[j].top)*0.0004f, 0.5f), Quaternion.identity) as GameObject;
-                windowObject[index].transform.position = new Vector3((iEFrameRect[j].left-400)*0.001f, (iEFrameRect[j].top-150)*0.001f, 0.4f + 0.01f*(index+1));
-                windowObject[index].transform.localScale = new Vector3((iEFrameRect[j].left-iEFrameRect[j].right)*0.0004f, (iEFrameRect[j].top-iEFrameRect[j].bottom)*0.0004f, 0.001f); 
-                windowObject[index].GetComponent<MeshRenderer>().material.mainTexture = LoadTextureFromFile("IEFrame_" + j + ".png");
-                index++;
-            }
-        }
-        for (int j = 0; j < 30; j++) {
-            if (j < index) {
-                windowObject[index].GetComponent<MeshRenderer>().enabled = true;
-            } else {
-                windowObject[index].GetComponent<MeshRenderer>().enabled = false;
-            }
-        }
-
-    }
-
+    /// <summary> Image File To Texture conversion of file record and load method </summary>
     public static Texture2D LoadTextureFromFile(string filename)
     {
-        // "Empty" texture. Will be replaced by LoadImage
-        Texture2D texture = new Texture2D(4, 4);
- 
+        Texture2D texture = new Texture2D(1, 1);
         FileStream fs = new FileStream(filename, FileMode.Open, FileAccess.Read);
         byte[] imageData = new byte[fs.Length];
         fs.Read(imageData, 0, (int)fs.Length);
@@ -319,21 +314,202 @@ public class CaptureWindowProcess : MonoBehaviour
         return texture;
     }
 
-    void BitmapToTexture2D(Bitmap bmp) // 비트맵 변수로부터 텍스처2D 생성
+    /// <summary> Takes an array of process handles as arguments and saves all corresponding processes as image files </summary>
+    private void ProcessHandleClassToImagefiles(IntPtr[] handle, User32.RECT[] rect, string className, string fileFormatName) 
     {
-        MemoryStream ms= new MemoryStream();
-        bmp.Save(ms, System.Drawing.Imaging.ImageFormat.Png);
-        var buffer = new byte[ms.Length];
-        ms.Position = 0;
-        ms.Read(buffer,0,buffer.Length);
-        Texture2D t = new Texture2D(1,1);
-        t.LoadImage(buffer);
+        for(int i = 0; handle[i] != IntPtr.Zero; i++) {
+            ProcessHandleToImageFile(handle[i], rect[i] , className + "_" + i + "." + fileFormatName);
+        }
     }
 
+    /// <summary> Takes a process handles as arguments and saves corresponding process as image file </summary>
+    public void ProcessHandleToImageFile(IntPtr handle, User32.RECT rect, string filename)
+    {
+        Image img = ProcessHandleToBitmap(handle, rect);
+        img.Save(filename);
+    }
+
+    /// <summary> For all processes with handles stored, switch to foreground if process is in background </summary>
+    void SetProcessForeground(IntPtr[] handle) { 
+        for(int i = 0; handle[i] != IntPtr.Zero; i++) {
+            User32.ShowWindowAsync(handle[i], 1);
+        }
+    }
+
+    #endregion
+
+
+
+    
+
+    #region Continuous playback Internal
+
+    //MemoryStream refreshMemoryStream;
+    private IEnumerator captureCoroutine;
+
+    /// <summary> Initiate continuous playback of the process corresponding to hTarget. </summary>
+    public void RefreshStart() {
+        if (captureCoroutine != null)
+            StartCoroutine(captureCoroutine);
+    }
+
+    /// <summary> Stop continuous playback of the process corresponding to hTarget. </summary>
+    public void RefreshStop() {
+        if (captureCoroutine != null)
+            StopCoroutine(captureCoroutine);
+    }
+
+    /// <summary> Coroutine that continuously updates the object corresponding to hTarget </summary>
+    float targetFrames = 10f;
+    private IEnumerator Refresh(GameObject obj, int index) {
+        while(true) {
+            try {
+                //ProcessHandleToImageFile(hTarget, rect_Target, "refresh.png");
+                //windowObject[index].GetComponent<MeshRenderer>().material.mainTexture = LoadTextureFromFile("refresh.png");
+                windowObject[index].GetComponent<MeshRenderer>().material.mainTexture = ProcessHandleToTexture2D(hTarget, rect_Target);
+            }
+            catch {
+
+            }
+            yield return new WaitForSeconds(1f/targetFrames);
+        }
+    }
+
+    /// <summary> Index the handle to find the desired process and save the handle and rect in hTarget and rect_Target respectively. </summary>
+    void HandleArrayIndexing(IntPtr[] handle, User32.RECT[] rect, int nTmp) {
+        for (int i = 0; i < 10; i++) {
+            if (handle[i] != IntPtr.Zero) {
+                if (nTmp == refreshTargetIndex) {
+                    hTarget = handle[i];
+                    rect_Target = rect[i];
+                    Debug.Log(refreshTargetIndex + " Founded");
+                }
+                refreshTargetIndex++;
+            }
+        }
+    }
+
+    #endregion
+
+    
+
+    
+    
+    #region Toggle Objects State
+
+    bool isWindowObjectsAreOn = false;
+    bool isWindowObjectsAreSpreaded = false;
+
+    /// <summary> Show all process windows </summary>
+    public void ShowAll() {
+        if (!isWindowObjectsAreOn) {
+            isWindowObjectsAreOn = true;
+            StartCoroutine("ShowWindows");
+        }
+    }
+
+    /// <summary> Hide all process windows </summary>
+    public void HideAll() {
+        if (isWindowObjectsAreOn) {
+            isWindowObjectsAreOn = false;
+            StartCoroutine("HideWindows");
+        }
+    }
+
+    /// <summary> Spread out all process windows </summary>
+    float radius = 0.8f;
+    public void SpreadAll() {
+        if (!isWindowObjectsAreSpreaded) {
+            isWindowObjectsAreSpreaded = true;
+            StartCoroutine("SpreadWindows");
+        }
+    }   
+
+    /// <summary> Collapse all process windows </summary>
+    public void CollapseAll() {
+        if (isWindowObjectsAreSpreaded) {
+            isWindowObjectsAreSpreaded = false;
+            StartCoroutine("CollapseWindows");
+        }
+          
+    }
+
+    /// <summary> Coroutine with a Tween that sets the transparency of all process windows to 0.7f </summary>
+    private IEnumerator ShowWindows() {
+        for (int j = 0; j < WindowObjectIndex; j++) {
+            LeanTween.alpha(windowObject[j], 0.7f, 0.4f);
+            yield return new WaitForSeconds(0.075f);
+        }
+        //Debug.Log("ShowCoroutine");
+    }
+    
+    /// <summary> Coroutine with a Tween that sets the transparency of all process windows to 0f </summary>
+    private IEnumerator HideWindows() {
+        for (int j = 0; j < WindowObjectIndex; j++) {
+            LeanTween.alpha(windowObject[j],0f,0.4f);
+            yield return new WaitForSeconds(0.075f);
+        }
+        //Debug.Log("HideCoroutine");
+    }
+    
+    /// <summary> Coroutine with a Tween that   </summary>
+    private IEnumerator SpreadWindows() {
+        float rad = 2f * Mathf.PI / (float)WindowObjectIndex;
+        Quaternion quater = Quaternion.identity;
+        for (int j = 0; j < WindowObjectIndex; j++) {
+            quater = Quaternion.LookRotation(new Vector3(radius * Mathf.Cos(rad*j), 0, radius * Mathf.Sin(rad*j)));
+
+            LeanTween.cancel( windowObject[j] );
+            LeanTween.move( windowObject[j], 
+                            new Vector3(    radius * Mathf.Cos(rad*j) ,         // x position
+                                            0,          // y position
+                                            radius * Mathf.Sin(rad*j)     ),     // z position
+                            0.4f ).setEase(LeanTweenType.easeOutCubic);
+            LeanTween.rotate( windowObject[j], quater.eulerAngles, 0.4f).setEase(LeanTweenType.easeOutCubic);
+            yield return new WaitForSeconds(0.04f);
+        }
+    }
+    
+    /// <summary> Coroutine with a Tween that   </summary>
+    private IEnumerator CollapseWindows() {
+        for (int j = 0; j < WindowObjectIndex; j++) {
+            LeanTween.cancel( windowObject[j] );
+            LeanTween.move( windowObject[j], 
+                            new Vector3(   ((rect_All[j].left + rect_All[j].right)*0.5f-screenWidth/2)*0.0005f,  // x position
+                                          -((rect_All[j].top + rect_All[j].bottom)*0.5f-screenHeight/2)*0.0005f, // y position
+                                            0.4f + 0.025f*(WindowObjectIndex+1)     ), 
+                            0.4f ).setEase(LeanTweenType.easeOutCubic);
+            LeanTween.rotate( windowObject[j], Vector3.zero, 0.4f).setEase(LeanTweenType.easeOutCubic);
+            yield return new WaitForSeconds(0.04f);
+        }     
+        //Debug.Log("HideCoroutine");
+    }
+
+    /// <summary> Toggle virtual mirror </summary>
+    public GameObject virtualMirror;
+    bool mirrorOn = false;
+    public void TurnMirror() {
+        if (mirrorOn) {
+            mirrorOn = false;
+            virtualMirror.SetActive(false);
+        } 
+        else {
+            mirrorOn = true;
+            virtualMirror.SetActive(true);
+        }
+    }
+
+    #endregion
+
+
+    
+
+    public GameObject WindowTarget;
 
     void Start(){
-        unityHandle = User32.GetActiveWindow();
-        Debug.Log(unityHandle);
+        GetProcessHandle();
+        MakeAll();
+        HideAll();
     }
 
     void Update()
@@ -345,10 +521,11 @@ public class CaptureWindowProcess : MonoBehaviour
             SetProcessForeground(hChromeWidgetWin1);
             SetProcessForeground(hIEFrame);
             SetProcessForeground(hPPTFrameClass);
+            SetProcessForeground(hApplicationFrameWindow);
         }
         if (Input.GetKeyDown(KeyCode.X))
         {
-            Capture();
+            AllHandleClassesToImageFiles();
         }
         if (Input.GetKeyDown(KeyCode.C))
         {
@@ -360,11 +537,35 @@ public class CaptureWindowProcess : MonoBehaviour
         }
         if (Input.GetKeyDown(KeyCode.A))
         {
+            handWatcher.windowState = 1;
             ShowAll();
         }
         if (Input.GetKeyDown(KeyCode.S))
         {
+            handWatcher.windowState = 0;
             HideAll();
         }
+        if (Input.GetKeyDown(KeyCode.D))
+        {
+            FindTargetHandle(WindowTarget);
+        }
+        if (Input.GetKeyDown(KeyCode.Q))
+        {
+            RefreshStart();
+        }
+        if (Input.GetKeyDown(KeyCode.W))
+        {
+            RefreshStop();
+        }
+
+        if (Input.GetKeyDown(KeyCode.E))
+        {
+            SpreadAll();
+        }
+        if (Input.GetKeyDown(KeyCode.R))
+        {
+            CollapseAll();
+        }
+        
     }
 }
